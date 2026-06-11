@@ -1,0 +1,7 @@
+# Copy to key.properties and set your keystore passwords.
+# Generate keystore:
+# keytool -genkey -v -keystore app/vynex-release-key.jks ...
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=vynex
+storeFile=vynex-release-key.jks

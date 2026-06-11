@@ -1,0 +1,60 @@
+// Reusable text input field with Vynex styling.
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+/// A styled text field matching the Vynex input theme.
+class VynexTextField extends StatelessWidget {
+  /// Creates a Vynex text field.
+  const VynexTextField({
+    super.key,
+    this.label,
+    this.hint,
+    this.controller,
+    this.validator,
+    this.keyboardType,
+    this.prefixText,
+    this.suffixIcon,
+    this.obscureText = false,
+    this.maxLength,
+    this.inputFormatters,
+    this.onChanged,
+    this.maxLines = 1,
+    this.textCapitalization = TextCapitalization.none,
+  });
+
+  final String? label;
+  final String? hint;
+  final TextEditingController? controller;
+  final String? Function(String?)? validator;
+  final TextInputType? keyboardType;
+  final String? prefixText;
+  final Widget? suffixIcon;
+  final bool obscureText;
+  final int? maxLength;
+  final List<TextInputFormatter>? inputFormatters;
+  final ValueChanged<String>? onChanged;
+  final int maxLines;
+  final TextCapitalization textCapitalization;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      validator: validator,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      maxLength: maxLength,
+      maxLines: maxLines,
+      textCapitalization: textCapitalization,
+      inputFormatters: inputFormatters,
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixText: prefixText,
+        suffixIcon: suffixIcon,
+      ),
+    );
+  }
+}
