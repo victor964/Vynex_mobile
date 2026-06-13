@@ -11,6 +11,7 @@ import '../../core/database/database_helper.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/snackbar_helper.dart';
+import '../../models/product.dart';
 import '../../models/sale.dart';
 import '../../providers/sale_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -40,6 +41,9 @@ class _EditSaleScreenState extends State<EditSaleScreen> {
   bool _isFullyPaid = true;
   bool _wasFullyPaid = true;
   String _saleType = 'product';
+  String _saleSource = 'manual';
+  double? _spotCost;
+  Product? _selectedProduct;
   String _paymentMethod = 'cash';
   bool _showLossWarning = false;
   bool _isSaving = false;
@@ -89,8 +93,16 @@ class _EditSaleScreenState extends State<EditSaleScreen> {
       _isFullyPaid = sale.isFullyPaid;
       _wasFullyPaid = sale.isFullyPaid;
       _saleType = sale.saleType;
+      _saleSource = sale.saleSource;
+      _spotCost = sale.spotCost;
       _paymentMethod = sale.paymentMethod;
 
+      if (sale.productId != null) {
+        _selectedProduct =
+            await DatabaseHelper().getProductById(sale.productId!);
+      }
+
+      if (!mounted) return;
       await context.read<SettingsProvider>().loadSettings();
       if (mounted) {
         setState(() => _isLoading = false);
@@ -182,6 +194,9 @@ class _EditSaleScreenState extends State<EditSaleScreen> {
       debtNote: _isFullyPaid ? null : _debtNoteController.text.trim(),
       paymentMethod: _paymentMethod,
       saleType: _saleType,
+      saleSource: _saleSource,
+      productId: _selectedProduct?.id,
+      spotCost: _spotCost,
     );
 
     setState(() => _isSaving = true);
@@ -239,7 +254,36 @@ class _EditSaleScreenState extends State<EditSaleScreen> {
       body: SingleChildScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: SaleFormBody(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.lightGrey,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _sourceIcon(_saleSource),
+                    color: AppColors.midGrey,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Source: ${_saleSourceLabel(_saleSource)} '
+                    '(cannot change)',
+                    style: const TextStyle(
+                      color: AppColors.midGrey,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            SaleFormBody(
           formKey: _formKey,
           itemNameController: _itemNameController,
           quantityController: _quantityController,
@@ -269,7 +313,35 @@ class _EditSaleScreenState extends State<EditSaleScreen> {
           onDateSelected: (date) => setState(() => _selectedDate = date),
           onFullyPaidChanged: _onFullyPaidChanged,
         ),
+          ],
+        ),
       ),
     );
+  }
+
+  String _saleSourceLabel(String source) {
+    switch (source) {
+      case 'stock':
+        return 'From Stock';
+      case 'spot_buy':
+        return 'Spot Buy';
+      case 'service':
+        return 'Service';
+      default:
+        return 'Manual';
+    }
+  }
+
+  IconData _sourceIcon(String source) {
+    switch (source) {
+      case 'stock':
+        return Icons.inventory_2_rounded;
+      case 'spot_buy':
+        return Icons.shopping_bag_rounded;
+      case 'service':
+        return Icons.build_rounded;
+      default:
+        return Icons.edit_rounded;
+    }
   }
 }

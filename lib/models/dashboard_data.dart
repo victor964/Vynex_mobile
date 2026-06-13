@@ -16,6 +16,12 @@ class DashboardData {
     required this.monthSpent,
     required this.recentSales,
     required this.recentPurchases,
+    this.totalCatalogProducts = 0,
+    this.lowStockCount = 0,
+    this.outOfStockCount = 0,
+    this.totalInventoryValue = 0.0,
+    this.totalCustomers = 0,
+    this.customersWithDebt = 0,
   });
 
   final int totalPurchases;
@@ -27,4 +33,10 @@ class DashboardData {
   final double monthSpent;
   final List<Sale> recentSales;
   final List<Purchase> recentPurchases;
+  final int totalCatalogProducts;
+  final int lowStockCount;
+  final int outOfStockCount;
+  final double totalInventoryValue;
+  final int totalCustomers;
+  final int customersWithDebt;
 }

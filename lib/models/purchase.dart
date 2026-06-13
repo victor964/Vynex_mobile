@@ -10,6 +10,8 @@ class Purchase {
     required this.costPrice,
     required this.datePurchased,
     this.notes,
+    this.productId,
+    this.purchaseType = 'general',
   }) : totalCost = quantity * costPrice;
 
   final int? id;
@@ -19,6 +21,11 @@ class Purchase {
   final double totalCost;
   final String datePurchased;
   final String? notes;
+  final int? productId;
+  final String purchaseType;
+
+  /// True when this purchase restocks catalog inventory.
+  bool get isRestock => purchaseType == 'restock';
 
   /// Creates a [Purchase] from a database map.
   factory Purchase.fromMap(Map<String, dynamic> map) {
@@ -29,6 +36,8 @@ class Purchase {
       costPrice: (map['cost_price'] as num).toDouble(),
       datePurchased: map['date_purchased'] as String,
       notes: map['notes'] as String?,
+      productId: map['product_id'] as int?,
+      purchaseType: map['purchase_type'] as String? ?? 'general',
     );
   }
 
@@ -42,6 +51,8 @@ class Purchase {
       'total_cost': totalCost,
       'date_purchased': datePurchased,
       'notes': notes,
+      'product_id': productId,
+      'purchase_type': purchaseType,
     };
   }
 
@@ -53,6 +64,8 @@ class Purchase {
     double? costPrice,
     String? datePurchased,
     String? notes,
+    int? productId,
+    String? purchaseType,
   }) {
     return Purchase(
       id: id ?? this.id,
@@ -61,6 +74,8 @@ class Purchase {
       costPrice: costPrice ?? this.costPrice,
       datePurchased: datePurchased ?? this.datePurchased,
       notes: notes ?? this.notes,
+      productId: productId ?? this.productId,
+      purchaseType: purchaseType ?? this.purchaseType,
     );
   }
 

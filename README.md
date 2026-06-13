@@ -1,233 +1,205 @@
-# Vynex Mobile V1
+# Vynex | Offline Business Manager
 
-**Offline business management for small-scale traders on Android.**
+<p align="center">
+  <img src="assets/icons/app_icon.png"
+       alt="Vynex Logo" width="120"/>
+</p>
 
-Vynex V1 is a complete, production-ready Flutter app that helps traders record purchases, track sales and profit, manage customer debts, and view business reports, all without internet, cloud accounts, or backend servers. Data is stored locally in SQLite on the device.
+<p align="center">
+  <strong>A fully offline Android business management
+  app for small-scale traders.</strong><br/>
+  No internet required. No monthly fees.
+  All data stays on your phone.
+</p>
 
-This repository preserves **Vynex V1.0.0** as a stable baseline. Future work (Vynex V2) continues from this codebase; use the `v1.0.0` Git tag to return to this exact release at any time.
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-2.0.0-FFD700?style=flat-square&labelColor=1a1a1a"/>
+  <img src="https://img.shields.io/badge/Platform-Android-FFD700?style=flat-square&labelColor=1a1a1a"/>
+  <img src="https://img.shields.io/badge/Flutter-3.x-FFD700?style=flat-square&labelColor=1a1a1a"/>
+  <img src="https://img.shields.io/badge/Min%20Android-5.0%20(API%2021)-FFD700?style=flat-square&labelColor=1a1a1a"/>
+  <img src="https://img.shields.io/badge/License-MIT-FFD700?style=flat-square&labelColor=1a1a1a"/>
+</p>
 
 ---
 
-## V1 at a glance
+## What is Vynex?
 
-| | |
+Vynex is a mobile Point of Sale and business management
+app built for small-scale traders who manage their
+business using a counter book. It replaces manual record
+keeping with a fast, clean and reliable digital system
+that works entirely offline.
+
+---
+
+## What is New in V2
+
+| Feature | Description |
 |---|---|
-| **Version** | 1.0.0 (build 1) |
-| **Platform** | Android (API 21 to 36) |
-| **Package** | `com.vynex.vynex` |
-| **Connectivity** | Fully offline |
-| **Database** | SQLite (sqflite), schema version 3 |
-| **State management** | Provider |
-| **Navigation** | GoRouter |
+| Product Catalog | Central library of all your products |
+| Inventory Tracking | Stock levels with low stock alerts |
+| Barcode Scanning | Scan via camera or type manually |
+| Sale Source Tracking | From Stock, Spot Buy, Service |
+| Customer Database | Profiles with full purchase history |
+| Invoice PDF | Professional invoices shareable via WhatsApp |
+| Enhanced Reports | Inventory and customer analytics tabs |
 
 ---
 
-## What V1 includes
+## Full Feature List
 
-### Authentication
-- 4-digit PIN login with SHA-256 hashed storage
-- Session persistence across app restarts
-- First-launch PIN change flow
-- Lock app from dashboard or settings
+### V1 Features (retained in V2)
+- PIN-secured login with custom 4-digit PIN
+- Purchase recording with date backdating
+- Sales with auto profit calculation
+- Payment method: Cash, M-Pesa, Paybill/Till
+- Service sales (revenue equals profit)
+- Debt tracking with installment payment history
+- Reports with charts and period filters
+- Excel export for sales, purchases and debts
+- Business settings with backup and restore
+- 100% offline, no internet needed
 
-### Dashboard
-- Live stats: total purchases, sales, profit, pending debts
-- This month summary (revenue, profit, spent)
-- Recent sales and purchases
-- Quick actions to add purchase or sale
-- Pull to refresh
-
-### Purchases
-- Full CRUD (create, read, update, delete)
-- Auto total cost (quantity x cost price)
-- Date backdating via date picker
-- Optional notes
-- List view with search and month filter
-- Scrollable table view with row actions
-- Delete confirmation dialog
-
-### Sales
-- Full CRUD with sale detail screen
-- Product and service sale types
-- Payment methods: Cash, M-Pesa, Paybill
-- Auto profit and revenue calculation
-- Loss warning when selling below cost
-- Fully paid vs not fully paid toggle
-- Automatic debt creation for unpaid sales
-- Initial payment on credit sales
-- Installment tracking and payment history
-- Date backdating
-
-### Debt tracker
-- Pending and Cleared tabs
-- Summary: total owed, collected, balance
-- Badge on bottom navigation for pending count
-- Debt detail with linked sale info
-- Record partial payments (today's amount)
-- Client name updates
-- Mark as fully cleared
-- Auto-clear when balance reaches zero
-
-### Reports
-- Period filters: Today, Last 7 Days, This Month, Custom range
-- Payment method and sale type filters
-- Six summary stat cards per period
-- Daily revenue vs profit line chart
-- Monthly overview bar chart (last 6 months)
-- Top performing items table
-- Insight strip (best seller, profitability)
-- Export sales, purchases, and debts to Excel
-- Share exports via WhatsApp, Telegram, and other apps
-
-### Settings
-- Business profile (name, owner, phone, currency, tagline)
-- Live preview card
-- Change PIN
-- Full database backup and restore
-- Reset business profile to defaults
-- Lock app
-
-### Polish (V1 release)
-- Custom gold-on-black app icon and splash screen
-- Gold and black Vynex theme throughout
-- Empty, loading, and error states on all modules
-- Haptic feedback on key actions
-- Pull to refresh on list screens
-- Release-signed APK build support
+### V2 New Features
+- Product Catalog with categories (predefined + custom)
+- Barcode scanning via phone camera (optional shortcut)
+- Inventory tracking with stock movement audit trail
+- Manual stock adjustment with reason logging
+- FROM STOCK sales deduct inventory automatically
+- SPOT BUY sales for items sourced on the spot
+- RESTOCK purchases increase inventory automatically
+- Customer database with name, phone, email, notes
+- Full purchase history per customer
+- Outstanding debt tracking per customer
+- Customer linking on sales (optional)
+- Invoice PDF generation with business branding
+- Invoice number format: VYX-YEAR-XXXX
+- Invoice history per customer and per sale
+- Sale source breakdown pie chart in reports
+- Inventory report tab: stock value, dead stock,
+  top moving items
+- Customer report tab: top customers, debt summary
+- Excel export for inventory and customer reports
 
 ---
 
-## Tech stack
+## Tech Stack
 
 | Layer | Technology |
-|-------|------------|
-| Framework | Flutter (Dart, null-safe) |
-| State | Provider |
-| Database | sqflite + path_provider |
-| Navigation | go_router |
+|---|---|
+| Framework | Flutter (latest stable) |
+| Language | Dart (null safe) |
+| State Management | Provider |
+| Local Database | SQLite via sqflite |
+| Navigation | GoRouter |
 | Charts | fl_chart |
-| Export | excel, share_plus |
-| Auth | crypto (SHA-256), shared_preferences |
-| Restore | file_picker |
+| Barcode Scanner | mobile_scanner |
+| Excel Export | excel package |
+| PDF Generation | pdf + printing |
+| File Sharing | share_plus |
+| File Picking | file_picker |
+| Date Formatting | intl |
+| PIN Hashing | crypto (SHA-256) |
+| Session Storage | shared_preferences |
 
 ---
 
-## Project structure
+## Database Schema (V2, version 4)
 
-```
-lib/
-  main.dart              App entry, MultiProvider setup
-  app.dart               MaterialApp, theme, router
-  core/                  Theme, database, router, utils
-  models/                Purchase, Sale, Debt, BusinessSettings, etc.
-  providers/             Auth, Purchase, Sale, Debt, Report, Settings
-  screens/               Splash, auth, dashboard, modules, settings
-  widgets/               Reusable UI components
-assets/
-  icons/                 App icon source PNGs
-  images/
-android/                 Android project and release signing config
-generate_icon.py         Script to regenerate the app icon
-```
+V2 adds 5 new tables on top of V1:
+  categories, products, stock_movements,
+  customers, invoices
+
+V2 adds new columns to V1 tables:
+  sales: product_id, sale_source, customer_id, spot_cost
+  purchases: product_id, purchase_type
+  debts: customer_id
+
+All V1 data is preserved when upgrading from V1 to V2.
 
 ---
 
-## Install the release APK
+## Sale Source Types
 
-1. Build or obtain `app-release.apk` (see below).
-2. Copy the APK to the phone (USB, WhatsApp, Telegram, or Google Drive).
-3. Enable **Install unknown apps** for the app used to open the file.
-4. Tap the APK and confirm install.
-5. Open **Vynex**. Default PIN: `1234`.
-6. Change your PIN when prompted on first launch.
+| Source | Stock Deducts | Catalog Required | Profit |
+|---|---|---|---|
+| FROM STOCK | Yes | Yes | selling minus catalog cost |
+| SPOT BUY | No | No | selling minus spot cost |
+| SERVICE | No | No | full service fee |
+| MANUAL | No | No | selling minus cost (V1 style) |
 
 ---
 
-## Build from source
-
-### Requirements
-- Flutter SDK (stable, 3.x+)
-- Android SDK (compile/target API 36)
-- Python 3 + Pillow (optional, for regenerating the app icon)
-
-### Steps
+## Building from Source
 
 ```bash
-flutter pub get
-python generate_icon.py          # optional, icons already in assets/
-dart run flutter_launcher_icons  # optional, mipmaps already generated
-flutter run                      # debug on connected device
-flutter build apk --release      # release APK
-```
-
-Release output: `build/app/outputs/flutter-apk/app-release.apk`
-
-### Release signing
-
-Copy `android/key.properties.example` to `android/key.properties` and create a keystore:
-
-```bash
-keytool -genkey -v -keystore android/app/vynex-release-key.jks \
-  -keyalg RSA -keysize 2048 -validity 10000 -alias vynex
-```
-
-Never commit `key.properties` or `*.jks` files. They are gitignored.
-
----
-
-## Database schema (V1)
-
-| Table | Purpose |
-|-------|---------|
-| `purchases` | Stock bought, cost, date, notes |
-| `sales` | Sales, profit, payment method, sale type, paid status |
-| `debts` | Linked to sales, payments, balance, cleared flag |
-| `business_settings` | Profile, currency, PIN hash |
-
-Schema version: **3** (includes payment_method, sale_type, payment_history).
-
----
-
-## Security and privacy
-
-- No internet permission in the Android manifest
-- No Firebase, analytics, or cloud sync
-- PIN stored as SHA-256 hash only
-- All business data remains on the device
-- Backup files are plain SQLite exports shared at the user's choice
-
----
-
-## Retrieving Vynex V1 later
-
-This repo is the V1 baseline. When V2 development advances, you can always return to V1:
-
-```bash
-git checkout v1.0.0
-# or clone and checkout the tag
+# Clone the repository
 git clone https://github.com/victor964/Vynex_mobile.git
 cd Vynex_mobile
-git checkout v1.0.0
+
+# Install dependencies
+flutter pub get
+
+# Generate app icons
+python generate_icon.py
+dart run flutter_launcher_icons
+
+# Run in debug mode
+flutter run
+
+# Build release APK
+flutter build apk --release
 ```
 
 ---
 
-## V2 roadmap (planned)
+## Version History
 
-V2 will build on this codebase. Possible directions include inventory levels, multi-user support, receipt printing, and enhanced reporting. V1 remains frozen at tag `v1.0.0` for reference and rollback.
+| Version | Tag | Description |
+|---|---|---|
+| 1.0.0 | v1.0.0 | First release. Sales, purchases, debts, reports |
+| 2.0.0 | v2.0.0 | V2 release. Catalog, inventory, customers, invoices |
+
+To retrieve V1 code at any time:
+```bash
+git checkout v1.0.0
+```
+
+To return to V2:
+```bash
+git checkout main
+```
 
 ---
 
-## License
+## Device Compatibility
 
-Copyright (c) Victor / Vynex project owner. All rights reserved.
+Works on all Android phones running Android 5.0 (API 21)
+or newer. Tested on Samsung SM-A366E (Android 16, API 36).
 
-This is a private commercial project. Unauthorized copying, distribution, or use is prohibited unless explicitly permitted by the owner.
+Compatible with: Samsung, Tecno, Infinix, Itel, Huawei,
+Xiaomi, Nokia, Oppo, Realme, Vivo and others.
+
+---
+
+## Distribution
+
+Share the APK file directly via WhatsApp or Telegram.
+See INSTALL_GUIDE.md for customer installation steps.
+
+Default PIN on fresh install: 1234
+User is prompted to change PIN on first login.
 
 ---
 
 ## Author
 
-**Victor** | [GitHub](https://github.com/victor964)
+**Victor Maina Njenga**
+ICT Professional and Software Developer | Murang'a, Kenya
+Portfolio: [vickcode.co.ke](https://vickcode.co.ke)
 
-Repository: [victor964/Vynex_mobile](https://github.com/victor964/Vynex_mobile)
+---
+
+<p align="center">
+  Built with Flutter | Made for small business owners
+</p>

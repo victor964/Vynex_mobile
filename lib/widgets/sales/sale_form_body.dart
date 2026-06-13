@@ -43,6 +43,13 @@ class SaleFormBody extends StatelessWidget {
     required this.onUpdatePreview,
     required this.onDateSelected,
     required this.onFullyPaidChanged,
+    this.contentAfterSaleType,
+    this.contentBeforePayment,
+    this.itemNameReadOnly = false,
+    this.costPriceReadOnly = false,
+    this.hideCostPrice = false,
+    this.itemNameHelperText,
+    this.costPriceHelperText,
   });
 
   final GlobalKey<FormState> formKey;
@@ -72,6 +79,13 @@ class SaleFormBody extends StatelessWidget {
   final VoidCallback onUpdatePreview;
   final ValueChanged<DateTime> onDateSelected;
   final ValueChanged<bool> onFullyPaidChanged;
+  final Widget? contentAfterSaleType;
+  final Widget? contentBeforePayment;
+  final bool itemNameReadOnly;
+  final bool costPriceReadOnly;
+  final bool hideCostPrice;
+  final String? itemNameHelperText;
+  final String? costPriceHelperText;
 
   bool get _isService => saleType == 'service';
 
@@ -139,6 +153,10 @@ class SaleFormBody extends StatelessWidget {
                   ),
             ),
           ],
+          if (contentAfterSaleType != null) ...[
+            const SizedBox(height: 16),
+            contentAfterSaleType!,
+          ],
           const SizedBox(height: 16),
           VynexTextField(
             label: _isService ? 'Service Description' : 'Item Name',
@@ -147,11 +165,23 @@ class SaleFormBody extends StatelessWidget {
                 : 'e.g. Cooking Oil 1L',
             controller: itemNameController,
             textCapitalization: TextCapitalization.words,
+            readOnly: !_isService && itemNameReadOnly,
             validator: (v) => Validators.required(
               v,
               _isService ? 'Service description' : 'Item name',
             ),
           ),
+          if (!_isService && itemNameHelperText != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              itemNameHelperText!,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.midGrey,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
           if (!_isService) ...[
             const SizedBox(height: 16),
             VynexTextField(
@@ -163,18 +193,33 @@ class SaleFormBody extends StatelessWidget {
               validator: (v) => Validators.positiveInteger(v, 'Quantity'),
               onChanged: (_) => onUpdatePreview(),
             ),
-            const SizedBox(height: 16),
-            VynexTextField(
-              label: 'Cost Price Per Unit',
-              hint: 'What you paid for one unit e.g. 85.00',
-              controller: costPriceController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+            if (!hideCostPrice) ...[
+              const SizedBox(height: 16),
+              VynexTextField(
+                label: 'Cost Price Per Unit',
+                hint: 'What you paid for one unit e.g. 85.00',
+                controller: costPriceController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                prefixText: '$currencyLabel ',
+                readOnly: costPriceReadOnly,
+                validator: (v) =>
+                    Validators.positiveNumber(v, 'Cost price'),
+                onChanged: (_) => onUpdatePreview(),
               ),
-              prefixText: '$currencyLabel ',
-              validator: (v) => Validators.positiveNumber(v, 'Cost price'),
-              onChanged: (_) => onUpdatePreview(),
-            ),
+              if (costPriceHelperText != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  costPriceHelperText!,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.midGrey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ],
             const SizedBox(height: 16),
             VynexTextField(
               label: 'Selling Price Per Unit',
@@ -305,6 +350,10 @@ class SaleFormBody extends StatelessWidget {
             paymentMethod: paymentMethod,
             onChanged: onPaymentMethodChanged,
           ),
+          if (contentBeforePayment != null) ...[
+            const SizedBox(height: 16),
+            contentBeforePayment!,
+          ],
           const SizedBox(height: 16),
           VynexCard(
             padding: const EdgeInsets.all(14),

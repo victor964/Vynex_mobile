@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/theme/app_colors.dart';
+
 /// A styled text field matching the Vynex input theme.
 class VynexTextField extends StatelessWidget {
   /// Creates a Vynex text field.
@@ -14,6 +16,7 @@ class VynexTextField extends StatelessWidget {
     this.validator,
     this.keyboardType,
     this.prefixText,
+    this.prefixIcon,
     this.suffixIcon,
     this.obscureText = false,
     this.maxLength,
@@ -21,6 +24,7 @@ class VynexTextField extends StatelessWidget {
     this.onChanged,
     this.maxLines = 1,
     this.textCapitalization = TextCapitalization.none,
+    this.readOnly = false,
   });
 
   final String? label;
@@ -29,6 +33,7 @@ class VynexTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
   final String? prefixText;
+  final IconData? prefixIcon;
   final Widget? suffixIcon;
   final bool obscureText;
   final int? maxLength;
@@ -36,6 +41,7 @@ class VynexTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final int maxLines;
   final TextCapitalization textCapitalization;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -49,10 +55,17 @@ class VynexTextField extends StatelessWidget {
       textCapitalization: textCapitalization,
       inputFormatters: inputFormatters,
       onChanged: onChanged,
+      readOnly: readOnly,
+      style: readOnly
+          ? const TextStyle(color: AppColors.midGrey)
+          : null,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         prefixText: prefixText,
+        prefixIcon: prefixIcon != null
+            ? Icon(prefixIcon, color: AppColors.gold, size: 20)
+            : null,
         suffixIcon: suffixIcon,
       ),
     );

@@ -9,6 +9,7 @@ import '../../core/database/database_helper.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/snackbar_helper.dart';
+import '../../models/customer.dart';
 import '../../models/debt.dart';
 import '../../models/sale.dart';
 import '../../providers/debt_provider.dart';
@@ -149,67 +150,99 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push('/sales/edit/${sale.id}'),
-                  icon: const Icon(
-                    Icons.edit_outlined,
-                    color: AppColors.gold,
-                    size: 18,
-                  ),
-                  label: const Text(
-                    'Edit Sale',
-                    style: TextStyle(
-                      color: AppColors.gold,
-                      fontWeight: FontWeight.w700,
+      bottomNavigationBar: _sale == null
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  12,
+                  8,
+                  12,
+                  12,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => context.push(
+                          '/sales/edit/${widget.saleId}',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: AppColors.gold,
+                            width: 2,
+                          ),
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Edit',
+                          style: TextStyle(
+                            color: AppColors.gold,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(
-                      color: AppColors.gold,
-                      width: 2,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => context.push(
+                          '/invoice/${widget.saleId}',
+                        ),
+                        icon: const Icon(
+                          Icons.receipt_long_rounded,
+                          size: 16,
+                          color: AppColors.black,
+                        ),
+                        label: const Text(
+                          'Invoice',
+                          style: TextStyle(
+                            color: AppColors.black,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.gold,
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
                     ),
-                    minimumSize: const Size(0, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _deleteSale,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.danger,
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Delete',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _deleteSale,
-                  icon: const Icon(
-                    Icons.delete_outline,
-                    color: AppColors.white,
-                    size: 18,
-                  ),
-                  label: const Text(
-                    'Delete Sale',
-                    style: TextStyle(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.danger,
-                    minimumSize: const Size(0, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -252,10 +285,101 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     ),
                     const _ThinDivider(),
                     _InfoRow(
+                      label: 'Sale Source',
+                      value: sale.saleSourceLabel,
+                      valueColor: _sourceColor(sale.saleSource),
+                    ),
+                    if (sale.isFromStock && sale.productId != null) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          children: [
+                            const Text(
+                              'Catalog Product',
+                              style: TextStyle(
+                                color: AppColors.midGrey,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: () => context.push(
+                                '/catalog/detail/${sale.productId}',
+                              ),
+                              child: const Text(
+                                'View Product',
+                                style: TextStyle(
+                                  color: AppColors.gold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const _ThinDivider(),
+                    _InfoRow(
                       label: 'Payment Method',
                       value: sale.paymentMethodLabel,
                       leadingIcon: _paymentIcon(sale.paymentMethod),
                     ),
+                    if (sale.customerId != null)
+                      FutureBuilder<Customer?>(
+                        future: DatabaseHelper()
+                            .getCustomerById(sale.customerId!),
+                        builder: (context, snapshot) {
+                          final customer = snapshot.data;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              children: [
+                                const Text(
+                                  'Customer',
+                                  style: TextStyle(
+                                    color: AppColors.midGrey,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const Spacer(),
+                                if (customer != null)
+                                  GestureDetector(
+                                    onTap: () => context.push(
+                                      '/customers/detail/'
+                                      '${customer.id}',
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          customer.name,
+                                          style: const TextStyle(
+                                            color: AppColors.gold,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Icon(
+                                          Icons.open_in_new_rounded,
+                                          color: AppColors.gold,
+                                          size: 14,
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  const Text(
+                                    'Loading...',
+                                    style: TextStyle(
+                                      color: AppColors.midGrey,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     const _ThinDivider(),
                     _InfoRow(
                       label: 'Date',
@@ -275,6 +399,17 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                           currency,
                         ),
                       ),
+                      if (sale.isSpotBuy && sale.spotCost != null) ...[
+                        const _ThinDivider(),
+                        _InfoRow(
+                          label: 'Spot Cost Paid',
+                          value: Formatters.formatCurrency(
+                            sale.spotCost!,
+                            currency,
+                          ),
+                          valueColor: AppColors.danger,
+                        ),
+                      ],
                     ],
                     const _ThinDivider(),
                     _InfoRow(
@@ -474,6 +609,19 @@ class _ProfitRow extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+Color _sourceColor(String source) {
+  switch (source) {
+    case 'stock':
+      return AppColors.success;
+    case 'spot_buy':
+      return AppColors.warning;
+    case 'service':
+      return AppColors.purple;
+    default:
+      return AppColors.midGrey;
   }
 }
 

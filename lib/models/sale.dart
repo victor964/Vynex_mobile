@@ -14,18 +14,25 @@ class Sale {
     this.debtNote,
     this.paymentMethod = 'cash',
     this.saleType = 'product',
+    this.productId,
+    this.saleSource = 'manual',
+    this.customerId,
+    this.spotCost,
     double? overrideProfit,
     double? overrideTotalRevenue,
-  })  : totalRevenue = saleType == 'service'
+  })  : totalRevenue = saleType == 'service' || saleSource == 'service'
             ? sellingPrice
             : (isFullyPaid
                 ? quantitySold * sellingPrice
                 : (overrideTotalRevenue ?? 0.0)),
-        profit = saleType == 'service'
+        profit = saleType == 'service' || saleSource == 'service'
             ? (isFullyPaid ? sellingPrice : 0.0)
             : (overrideProfit ??
                 (isFullyPaid
-                    ? (sellingPrice - costPrice) * quantitySold
+                    ? saleSource == 'spot_buy'
+                        ? (sellingPrice - (spotCost ?? 0.0)) *
+                            quantitySold
+                        : (sellingPrice - costPrice) * quantitySold
                     : 0.0));
 
   final int? id;
@@ -40,12 +47,33 @@ class Sale {
   final String dateSold;
   final String paymentMethod;
   final String saleType;
+  final int? productId;
+  final String saleSource;
+  final int? customerId;
+  final double? spotCost;
 
   /// True when this sale is a service (not a product).
-  bool get isService => saleType == 'service';
+  bool get isService =>
+      saleType == 'service' || saleSource == 'service';
 
   /// True when this sale is a product.
   bool get isProduct => saleType == 'product';
+
+  bool get isFromStock => saleSource == 'stock';
+  bool get isSpotBuy => saleSource == 'spot_buy';
+
+  String get saleSourceLabel {
+    switch (saleSource) {
+      case 'stock':
+        return 'From Stock';
+      case 'spot_buy':
+        return 'Spot Buy';
+      case 'service':
+        return 'Service';
+      default:
+        return 'Manual';
+    }
+  }
 
   /// Display label for payment method.
   String get paymentMethodLabel {
@@ -74,7 +102,9 @@ class Sale {
   /// Full profit if this item were completely paid.
   double get potentialProfit => isService
       ? sellingPrice
-      : (sellingPrice - costPrice) * quantitySold;
+      : isSpotBuy
+          ? (sellingPrice - (spotCost ?? 0.0)) * quantitySold
+          : (sellingPrice - costPrice) * quantitySold;
 
   /// Full revenue if this item were completely paid.
   double get potentialRevenue =>
@@ -93,6 +123,10 @@ class Sale {
       dateSold: map['date_sold'] as String,
       paymentMethod: map['payment_method'] as String? ?? 'cash',
       saleType: map['sale_type'] as String? ?? 'product',
+      productId: map['product_id'] as int?,
+      saleSource: map['sale_source'] as String? ?? 'manual',
+      customerId: map['customer_id'] as int?,
+      spotCost: (map['spot_cost'] as num?)?.toDouble(),
       overrideProfit: (map['profit'] as num).toDouble(),
       overrideTotalRevenue: (map['total_revenue'] as num).toDouble(),
     );
@@ -113,6 +147,10 @@ class Sale {
       'date_sold': dateSold,
       'payment_method': paymentMethod,
       'sale_type': saleType,
+      'product_id': productId,
+      'sale_source': saleSource,
+      'customer_id': customerId,
+      'spot_cost': spotCost,
     };
   }
 
@@ -128,6 +166,10 @@ class Sale {
     String? dateSold,
     String? paymentMethod,
     String? saleType,
+    int? productId,
+    String? saleSource,
+    int? customerId,
+    double? spotCost,
     bool clearDebtNote = false,
     double? overrideProfit,
     double? overrideTotalRevenue,
@@ -143,6 +185,10 @@ class Sale {
       dateSold: dateSold ?? this.dateSold,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       saleType: saleType ?? this.saleType,
+      productId: productId ?? this.productId,
+      saleSource: saleSource ?? this.saleSource,
+      customerId: customerId ?? this.customerId,
+      spotCost: spotCost ?? this.spotCost,
       overrideProfit: overrideProfit,
       overrideTotalRevenue: overrideTotalRevenue,
     );
@@ -151,5 +197,5 @@ class Sale {
   @override
   String toString() => 'Sale(id: $id, item: $itemName, qty: $quantitySold, '
       'profit: $profit, paid: $isFullyPaid, type: $saleType, '
-      'method: $paymentMethod, date: $dateSold)';
+      'source: $saleSource, method: $paymentMethod, date: $dateSold)';
 }

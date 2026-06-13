@@ -9,6 +9,7 @@ import '../core/database/database_helper.dart';
 import '../core/utils/formatters.dart';
 import '../models/debt.dart';
 import '../models/sale.dart';
+import '../models/stock_movement.dart';
 
 /// Manages sale list state, CRUD, and debt side effects.
 class SaleProvider extends ChangeNotifier {
@@ -80,12 +81,39 @@ class SaleProvider extends ChangeNotifier {
               debtNote: sale.debtNote,
               paymentMethod: sale.paymentMethod,
               saleType: sale.saleType,
+              productId: sale.productId,
+              saleSource: sale.saleSource,
+              customerId: sale.customerId,
+              spotCost: sale.spotCost,
               overrideProfit: 0.0,
               overrideTotalRevenue: 0.0,
             )
           : sale;
 
       final newId = await db.insertSale(saleToSave);
+
+      if (sale.saleSource == 'stock' && sale.productId != null) {
+        final product = await db.getProductById(sale.productId!);
+        if (product != null) {
+          final newStock =
+              product.currentStock - sale.quantitySold;
+          await db.updateProductStock(
+            sale.productId!,
+            newStock < 0 ? 0 : newStock,
+          );
+          await db.insertStockMovement(
+            StockMovement(
+              productId: sale.productId!,
+              movementType: 'sale',
+              quantity: -sale.quantitySold,
+              referenceId: newId,
+              referenceType: 'sale',
+              note: 'Sale: ${sale.itemName}',
+              dateRecorded: sale.dateSold,
+            ),
+          );
+        }
+      }
 
       if (!sale.isFullyPaid) {
         final amountOwed = sale.isService
@@ -114,7 +142,10 @@ class SaleProvider extends ChangeNotifier {
           dateCreated: sale.dateSold,
           lastUpdated: sale.dateSold,
         );
-        await db.insertDebt(debt);
+        final debtId = await db.insertDebt(debt);
+        if (sale.customerId != null) {
+          await db.linkDebtToCustomer(debtId, sale.customerId!);
+        }
       }
 
       await loadSales();

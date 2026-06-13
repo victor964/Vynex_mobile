@@ -2,18 +2,23 @@
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/database/database_helper.dart';
+import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/export_helper.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/snackbar_helper.dart';
+import '../../models/product.dart';
 import '../../models/report_data.dart';
 import '../../providers/report_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../widgets/catalog/stock_badge_widget.dart';
+import '../../widgets/common/empty_state_widget.dart';
 import '../../widgets/common/stat_card.dart';
-import '../../widgets/common/vynex_app_bar.dart';
 import '../../widgets/common/vynex_button.dart';
 import '../../widgets/common/vynex_card.dart';
 
@@ -32,6 +37,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   bool _isExportingSales = false;
   bool _isExportingPurchases = false;
   bool _isExportingDebts = false;
+  bool _exportingInventory = false;
+  bool _exportingCustomers = false;
 
   @override
   void initState() {
@@ -44,74 +51,1215 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const VynexAppBar(
-        title: 'Reports',
-        showSettings: true,
-      ),
-      body: Consumer<ReportProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading && provider.data == null) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.gold),
-            );
-          }
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Reports',
+            style: TextStyle(
+              color: AppColors.gold,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
+          backgroundColor: AppColors.black,
+          foregroundColor: AppColors.gold,
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings_rounded),
+              color: AppColors.gold,
+              tooltip: 'Settings',
+              onPressed: () => context.push(AppRoutes.settings),
+            ),
+          ],
+          bottom: const TabBar(
+            indicatorColor: AppColors.gold,
+            labelColor: AppColors.gold,
+            unselectedLabelColor: AppColors.midGrey,
+            labelStyle: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            tabs: [
+              Tab(text: 'Sales'),
+              Tab(text: 'Inventory'),
+              Tab(text: 'Customers'),
+            ],
+          ),
+        ),
+        body: Consumer<ReportProvider>(
+          builder: (context, provider, _) {
+            if (provider.isLoading && provider.data == null) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.gold),
+              );
+            }
 
-          final data = provider.data;
-          if (data == null) {
-            return _emptyChartState('No report data available.');
-          }
+            final data = provider.data;
+            if (data == null) {
+              return _emptyChartState('No report data available.');
+            }
 
-          final width = MediaQuery.of(context).size.width;
-          final cardWidth = (width - 32 - 10) / 2;
-
-          return RefreshIndicator(
-            color: AppColors.gold,
-            onRefresh: provider.loadReport,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            return TabBarView(
               children: [
-                _buildPeriodFilter(provider),
-                const SizedBox(height: 12),
-                _buildPaymentMethodFilter(provider),
-                const SizedBox(height: 12),
-                _buildSaleTypeFilter(provider),
-                const SizedBox(height: 16),
-                const Text(
-                  'Summary',
-                  style: TextStyle(
-                    color: AppColors.black,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                _buildSalesReportTab(data, provider),
+                _buildInventoryReportTab(data, provider),
+                _buildCustomerReportTab(data, provider),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportSales(ReportData data) async {
+    setState(() => _isExportingSales = true);
+    try {
+      final settings = context.read<SettingsProvider>();
+      await ExportHelper.exportSales(
+        data.allSales,
+        settings.currencyLabel,
+        businessName: settings.businessName,
+      );
+    } catch (_) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Export failed. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingSales = false);
+      }
+    }
+  }
+
+  Future<void> _exportPurchases(ReportData data) async {
+    setState(() => _isExportingPurchases = true);
+    try {
+      await ExportHelper.exportPurchases(
+        data.allPurchases,
+        context.read<SettingsProvider>().currencyLabel,
+      );
+    } catch (_) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Export failed. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingPurchases = false);
+      }
+    }
+  }
+
+  Future<void> _exportDebts() async {
+    setState(() => _isExportingDebts = true);
+    try {
+      await ExportHelper.exportDebts(
+        context.read<SettingsProvider>().currencyLabel,
+      );
+    } catch (_) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Export failed. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingDebts = false);
+      }
+    }
+  }
+
+  Future<void> _exportInventoryReport() async {
+    setState(() => _exportingInventory = true);
+    final settings = context.read<SettingsProvider>();
+    try {
+      final db = DatabaseHelper();
+      final products = await db.getProducts();
+      if (!mounted) {
+        return;
+      }
+      await ExportHelper.exportInventory(
+        products: products,
+        currencyLabel: settings.currencyLabel,
+        businessName: settings.businessName,
+      );
+    } catch (_) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Export failed. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _exportingInventory = false);
+      }
+    }
+  }
+
+  Future<void> _exportCustomerReport() async {
+    setState(() => _exportingCustomers = true);
+    final settings = context.read<SettingsProvider>();
+    final data = context.read<ReportProvider>().data;
+    try {
+      if (data == null) {
+        return;
+      }
+      await ExportHelper.exportCustomers(
+        topCustomers: data.customerData.topCustomers,
+        debtCustomers: data.customerData.customersWithActiveDebt,
+        currencyLabel: settings.currencyLabel,
+        businessName: settings.businessName,
+      );
+    } catch (_) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Export failed. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _exportingCustomers = false);
+      }
+    }
+  }
+
+  Widget _buildSalesReportTab(ReportData data, ReportProvider provider) {
+    final width = MediaQuery.of(context).size.width;
+    final cardWidth = (width - 32 - 10) / 2;
+
+    return RefreshIndicator(
+      color: AppColors.gold,
+      onRefresh: provider.loadReport,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildPeriodFilter(provider),
+            const SizedBox(height: 12),
+            _buildPaymentMethodFilter(provider),
+            const SizedBox(height: 12),
+            _buildSaleTypeFilter(provider),
+            const SizedBox(height: 12),
+            _buildSaleSourceFilter(provider),
+            const SizedBox(height: 16),
+            const Text(
+              'Summary',
+              style: TextStyle(
+                color: AppColors.black,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _buildStatCards(data, cardWidth),
+            ),
+            if (data.paidSalesCount > 0) ...[
+              const SizedBox(height: 16),
+              _buildInsightsStrip(data, provider),
+            ],
+            const SizedBox(height: 16),
+            _buildDailyChart(data),
+            const SizedBox(height: 16),
+            _buildMonthlyChart(data),
+            const SizedBox(height: 16),
+            _buildSourceBreakdownChart(data),
+            const SizedBox(height: 16),
+            _buildTopItems(data),
+            const SizedBox(height: 16),
+            _buildExportSection(
+              data,
+              isExportingSales: _isExportingSales,
+              isExportingPurchases: _isExportingPurchases,
+              isExportingDebts: _isExportingDebts,
+              onExportSales: () => _exportSales(data),
+              onExportPurchases: () => _exportPurchases(data),
+              onExportDebts: _exportDebts,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInventoryReportTab(
+    ReportData data,
+    ReportProvider provider,
+  ) {
+    final currency = context.read<SettingsProvider>().currencyLabel;
+    final inventory = data.inventoryData;
+    final width = MediaQuery.of(context).size.width;
+    final cardWidth = (width - 32 - 10) / 2;
+    final profitPositive = inventory.potentialProfit > 0;
+
+    return RefreshIndicator(
+      color: AppColors.gold,
+      onRefresh: provider.loadReport,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                SizedBox(
+                  width: cardWidth,
+                  child: StatCard(
+                    label: 'Total Products',
+                    value: '${inventory.totalProducts}',
+                    icon: Icons.inventory_2_rounded,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: _buildStatCards(data, cardWidth),
+                SizedBox(
+                  width: cardWidth,
+                  child: StatCard(
+                    label: 'Stock Value (Cost)',
+                    value: Formatters.formatCurrency(
+                      inventory.totalStockValueAtCost,
+                      currency,
+                    ),
+                    icon: Icons.paid_rounded,
+                    subtitle: 'at purchase price',
+                  ),
                 ),
-                if (data.paidSalesCount > 0) ...[
-                  const SizedBox(height: 16),
-                  _buildInsightsStrip(data, provider),
-                ],
-                const SizedBox(height: 16),
-                _buildDailyChart(data),
-                const SizedBox(height: 16),
-                _buildMonthlyChart(data),
-                const SizedBox(height: 16),
-                _buildTopItems(data),
-                const SizedBox(height: 16),
-                _buildExportSection(data),
+                SizedBox(
+                  width: cardWidth,
+                  child: StatCard(
+                    label: 'Retail Value',
+                    value: Formatters.formatCurrency(
+                      inventory.totalStockValueAtRetail,
+                      currency,
+                    ),
+                    icon: Icons.storefront_rounded,
+                    subtitle: 'at selling price',
+                  ),
+                ),
+                SizedBox(
+                  width: cardWidth,
+                  child: StatCard(
+                    label: 'Potential Profit',
+                    value: Formatters.formatCurrency(
+                      inventory.potentialProfit,
+                      currency,
+                    ),
+                    icon: Icons.trending_up_rounded,
+                    accentColor: profitPositive
+                        ? AppColors.success
+                        : AppColors.danger,
+                    valueColor: profitPositive
+                        ? AppColors.success
+                        : AppColors.danger,
+                  ),
+                ),
               ],
             ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Text(
+                  'In Stock: ${inventory.inStockCount}',
+                  style: const TextStyle(
+                    color: AppColors.success,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  'Low Stock: ${inventory.lowStockCount}',
+                  style: const TextStyle(
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  'Out of Stock: ${inventory.outOfStockCount}',
+                  style: const TextStyle(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildLowStockSection(inventory),
+            const SizedBox(height: 20),
+            _buildDeadStockSection(inventory, currency),
+            const SizedBox(height: 20),
+            _buildTopMovingSection(inventory, currency),
+            const SizedBox(height: 20),
+            VynexButton.secondary(
+              label: 'Export Inventory to Excel',
+              icon: Icons.table_chart_outlined,
+              isLoading: _exportingInventory,
+              onPressed: _exportInventoryReport,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLowStockSection(InventoryReportData inventory) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: AppColors.warning,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Items Needing Restock',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: AppColors.black,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${inventory.lowStockCount}',
+                style: const TextStyle(
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (inventory.lowStockItems.isEmpty)
+          const Text(
+            'All products are well stocked.',
+            style: TextStyle(
+              color: AppColors.midGrey,
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+            ),
+          )
+        else ...[
+          ...inventory.lowStockItems.map(_buildLowStockRow),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => context.push(AppRoutes.inventory),
+            child: const Text(
+              'View All in Inventory',
+              style: TextStyle(color: AppColors.gold),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildLowStockRow(LowStockItem item) {
+    final product = Product(
+      id: item.productId,
+      name: item.productName,
+      currentStock: item.currentStock,
+      lowStockThreshold: item.threshold,
+      unit: item.unit,
+      dateAdded: '',
+      lastUpdated: '',
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: VynexCard(
+        child: Container(
+          color: AppColors.warning.withValues(alpha: 0.06),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.productName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: AppColors.black,
+                      ),
+                    ),
+                  ),
+                  StockBadgeWidget(product: product),
+                ],
+              ),
+              if (item.currentStock > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Only ${item.currentStock} ${item.unit}s left. '
+                    'Alert threshold: ${item.threshold}',
+                    style: const TextStyle(
+                      color: AppColors.warning,
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                )
+              else
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(
+                    'OUT OF STOCK',
+                    style: TextStyle(
+                      color: AppColors.danger,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.gold,
+                    side: const BorderSide(color: AppColors.gold),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => context.push(
+                    '/inventory/adjust/${item.productId}?mode=add',
+                  ),
+                  child: const Text(
+                    'Restock',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeadStockSection(
+    InventoryReportData inventory,
+    String currency,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(
+              Icons.hourglass_top_rounded,
+              color: AppColors.gold,
+              size: 18,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Slow Moving Stock',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: AppColors.black,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Products with no sales in 30 days',
+          style: TextStyle(
+            color: AppColors.midGrey,
+            fontSize: 11,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (inventory.deadStockItems.isEmpty)
+          const Text(
+            'No dead stock. All products are selling well.',
+            style: TextStyle(color: AppColors.midGrey, fontSize: 12),
+          )
+        else ...[
+          _deadStockTable(inventory.deadStockItems, currency),
+          const SizedBox(height: 8),
+          const Text(
+            'Consider running a promotion to clear slow stock '
+            'and recover your investment.',
+            style: TextStyle(
+              color: AppColors.midGrey,
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _deadStockTable(
+    List<DeadStockItem> items,
+    String currency,
+  ) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          color: AppColors.darkGrey,
+          child: const Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(
+                  'Product',
+                  style: TextStyle(
+                    color: AppColors.gold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'Stock',
+                  style: TextStyle(
+                    color: AppColors.gold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  'Value',
+                  style: TextStyle(
+                    color: AppColors.gold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  'Last Sold',
+                  style: TextStyle(
+                    color: AppColors.gold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...items.map((item) {
+          final lastDate = item.lastSaleDate == 'Never sold'
+              ? 'Never sold'
+              : Formatters.formatDate(item.lastSaleDate);
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: AppColors.lightGrey),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    item.productName,
+                    style: const TextStyle(fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    '${item.currentStock}',
+                    style: const TextStyle(fontSize: 11),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    Formatters.formatCurrency(item.stockValue, currency),
+                    style: const TextStyle(fontSize: 11),
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    lastDate,
+                    style: const TextStyle(fontSize: 10),
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           );
-        },
+        }),
+      ],
+    );
+  }
+
+  Widget _buildTopMovingSection(
+    InventoryReportData inventory,
+    String currency,
+  ) {
+    final hasSales = inventory.topMovingItems.any(
+      (item) => item.totalUnitsSold > 0,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(
+              Icons.local_fire_department_rounded,
+              color: AppColors.warning,
+              size: 18,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Top Moving Products',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: AppColors.black,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          '(by units sold via catalog)',
+          style: TextStyle(
+            color: AppColors.midGrey,
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (!hasSales)
+          const Text(
+            'No catalog sales recorded yet.',
+            style: TextStyle(color: AppColors.midGrey, fontSize: 12),
+          )
+        else
+          ...List.generate(inventory.topMovingItems.length, (index) {
+            final item = inventory.topMovingItems[index];
+            if (item.totalUnitsSold == 0) {
+              return const SizedBox.shrink();
+            }
+            final isFirst = index == 0;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isFirst
+                    ? AppColors.gold.withValues(alpha: 0.12)
+                    : AppColors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.lightGrey),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: AppColors.gold,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.black,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.productName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          '${item.totalUnitsSold} units sold',
+                          style: const TextStyle(
+                            color: AppColors.midGrey,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    Formatters.formatCurrency(
+                      item.totalRevenue,
+                      currency,
+                    ),
+                    style: const TextStyle(
+                      color: AppColors.gold,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildCustomerReportTab(
+    ReportData data,
+    ReportProvider provider,
+  ) {
+    final currency = context.read<SettingsProvider>().currencyLabel;
+    final customers = data.customerData;
+    final width = MediaQuery.of(context).size.width;
+    final cardWidth = (width - 32 - 10) / 2;
+    final hasDebt = customers.customersWithDebt > 0;
+    final debtPositive = customers.totalOutstandingDebt > 0;
+
+    return RefreshIndicator(
+      color: AppColors.gold,
+      onRefresh: provider.loadReport,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                SizedBox(
+                  width: cardWidth,
+                  child: StatCard(
+                    label: 'Total Customers',
+                    value: '${customers.totalCustomers}',
+                    icon: Icons.people_rounded,
+                  ),
+                ),
+                SizedBox(
+                  width: cardWidth,
+                  child: StatCard(
+                    label: 'New This Period',
+                    value: '${customers.newCustomersThisPeriod}',
+                    icon: Icons.person_add_rounded,
+                    subtitle: 'joined in selected period',
+                  ),
+                ),
+                SizedBox(
+                  width: cardWidth,
+                  child: StatCard(
+                    label: 'With Active Debt',
+                    value: '${customers.customersWithDebt}',
+                    icon: Icons.account_balance_wallet_rounded,
+                    accentColor:
+                        hasDebt ? AppColors.danger : AppColors.success,
+                    valueColor:
+                        hasDebt ? AppColors.danger : AppColors.success,
+                  ),
+                ),
+                SizedBox(
+                  width: cardWidth,
+                  child: StatCard(
+                    label: 'Outstanding Debt',
+                    value: Formatters.formatCurrency(
+                      customers.totalOutstandingDebt,
+                      currency,
+                    ),
+                    icon: Icons.money_off_rounded,
+                    accentColor:
+                        debtPositive ? AppColors.danger : AppColors.gold,
+                    valueColor:
+                        debtPositive ? AppColors.danger : AppColors.black,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildTopCustomersSection(customers, currency),
+            const SizedBox(height: 20),
+            _buildCustomerDebtSection(customers, currency),
+            const SizedBox(height: 20),
+            VynexButton.secondary(
+              label: 'Export Customer Report to Excel',
+              icon: Icons.table_chart_outlined,
+              isLoading: _exportingCustomers,
+              onPressed: _exportCustomerReport,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildTopCustomersSection(
+    CustomerReportData customers,
+    String currency,
+  ) {
+    final hasSpend = customers.topCustomers.any((c) => c.totalSpent > 0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.star_rounded, color: AppColors.gold, size: 18),
+            SizedBox(width: 8),
+            Text(
+              'Top Customers',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: AppColors.black,
+              ),
+            ),
+            SizedBox(width: 6),
+            Text(
+              '(by spend in selected period)',
+              style: TextStyle(color: AppColors.midGrey, fontSize: 11),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (!hasSpend)
+          const Text(
+            'No customer purchases in this period.',
+            style: TextStyle(color: AppColors.midGrey, fontSize: 12),
+          )
+        else
+          ...List.generate(customers.topCustomers.length, (index) {
+            final customer = customers.topCustomers[index];
+            if (customer.totalSpent <= 0) {
+              return const SizedBox.shrink();
+            }
+            final isFirst = index == 0;
+            final initial = customer.customerName.isNotEmpty
+                ? customer.customerName[0].toUpperCase()
+                : '?';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: () => context.push(
+                  '/customers/detail/${customer.customerId}',
+                ),
+                borderRadius: BorderRadius.circular(12),
+                child: VynexCard(
+                  child: Container(
+                    color: isFirst
+                        ? AppColors.gold.withValues(alpha: 0.1)
+                        : null,
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 20,
+                          height: 20,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: AppColors.gold,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${index + 1}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.black,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor:
+                              AppColors.gold.withValues(alpha: 0.2),
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              color: AppColors.goldDark,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                customer.customerName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                '${customer.totalPurchases} purchases',
+                                style: const TextStyle(
+                                  color: AppColors.midGrey,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              if (customer.lastPurchaseDate != null)
+                                Text(
+                                  'Last: ${Formatters.formatDate(customer.lastPurchaseDate!)}',
+                                  style: const TextStyle(
+                                    color: AppColors.midGrey,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              Formatters.formatCurrency(
+                                customer.totalSpent,
+                                currency,
+                              ),
+                              style: const TextStyle(
+                                color: AppColors.gold,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const Text(
+                              'total spent',
+                              style: TextStyle(
+                                color: AppColors.midGrey,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildCustomerDebtSection(
+    CustomerReportData customers,
+    String currency,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(
+              Icons.warning_rounded,
+              color: AppColors.danger,
+              size: 18,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Customers with Outstanding Debts',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: AppColors.danger,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (customers.customersWithActiveDebt.isEmpty)
+          const Row(
+            children: [
+              Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.gold,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'No customers have outstanding debts.',
+                style: TextStyle(
+                  color: AppColors.success,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          )
+        else
+          ...customers.customersWithActiveDebt.map((customer) {
+            final initial = customer.customerName.isNotEmpty
+                ? customer.customerName[0].toUpperCase()
+                : '?';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: VynexCard(
+                child: Container(
+                  color: AppColors.danger.withValues(alpha: 0.06),
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor:
+                            AppColors.danger.withValues(alpha: 0.15),
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
+                            color: AppColors.danger,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              customer.customerName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              '${customer.debtCount} unpaid sale(s)',
+                              style: const TextStyle(
+                                color: AppColors.midGrey,
+                                fontSize: 11,
+                              ),
+                            ),
+                            if (customer.customerPhone != null &&
+                                customer.customerPhone!.isNotEmpty)
+                              Text(
+                                customer.customerPhone!,
+                                style: const TextStyle(
+                                  color: AppColors.midGrey,
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            Formatters.formatCurrency(
+                              customer.totalDebtBalance,
+                              currency,
+                            ),
+                            style: const TextStyle(
+                              color: AppColors.danger,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const Text(
+                            'owed',
+                            style: TextStyle(
+                              color: AppColors.danger,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.gold,
+                          side: const BorderSide(color: AppColors.gold),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => context.push(
+                          '/customers/detail/${customer.customerId}',
+                        ),
+                        child: const Text(
+                          'View',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+      ],
     );
   }
 
@@ -438,6 +1586,57 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
+  Widget _buildSaleSourceFilter(ReportProvider provider) {
+    return VynexCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Sale Source:',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.midGrey,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _filterPill(
+                label: 'All',
+                isActive: provider.saleSourceFilter == 'all',
+                onTap: () => provider.setSaleSourceFilter('all'),
+              ),
+              _filterPill(
+                label: 'From Stock',
+                isActive: provider.saleSourceFilter == 'stock',
+                onTap: () => provider.setSaleSourceFilter('stock'),
+              ),
+              _filterPill(
+                label: 'Spot Buy',
+                isActive: provider.saleSourceFilter == 'spot_buy',
+                onTap: () => provider.setSaleSourceFilter('spot_buy'),
+              ),
+              _filterPill(
+                label: 'Service',
+                isActive: provider.saleSourceFilter == 'service',
+                onTap: () => provider.setSaleSourceFilter('service'),
+              ),
+              _filterPill(
+                label: 'Manual',
+                isActive: provider.saleSourceFilter == 'manual',
+                onTap: () => provider.setSaleSourceFilter('manual'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _filterPill({
     required String label,
     required bool isActive,
@@ -507,6 +1706,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             icon: Icons.schedule,
             label: 'Installment Sales: ',
             value: '${data.installmentSalesCount} sales',
+            valueColor: AppColors.black,
           ),
         ],
       ),
@@ -517,6 +1717,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     required IconData icon,
     required String label,
     required String value,
+    Color valueColor = AppColors.gold,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -538,8 +1739,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(
-                  color: AppColors.gold,
+                style: TextStyle(
+                  color: valueColor,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -683,6 +1884,223 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourceBreakdownChart(ReportData data) {
+    final currency = context.read<SettingsProvider>().currencyLabel;
+    final breakdown = data.sourceBreakdown;
+
+    return VynexCard(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            const Row(
+              children: [
+                Text(
+                  'Sales by Source',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: AppColors.black,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (breakdown.totalCount == 0)
+              const EmptyStateWidget(
+                icon: Icons.pie_chart_outline_rounded,
+                title: 'No source data',
+                subtitle: 'Record sales to see breakdown',
+              )
+            else
+              Row(
+                children: [
+                  SizedBox(
+                    width: 140,
+                    height: 140,
+                    child: RepaintBoundary(
+                      child: PieChart(
+                        PieChartData(
+                          sectionsSpace: 2,
+                          centerSpaceRadius: 35,
+                          sections: _buildPieSections(breakdown),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _legendItem(
+                          'From Stock',
+                          AppColors.success,
+                          breakdown.stockCount,
+                          breakdown.stockRevenue,
+                          currency,
+                        ),
+                        _legendItem(
+                          'Spot Buy',
+                          AppColors.warning,
+                          breakdown.spotBuyCount,
+                          breakdown.spotBuyRevenue,
+                          currency,
+                        ),
+                        _legendItem(
+                          'Service',
+                          const Color(0xFF9C27B0),
+                          breakdown.serviceCount,
+                          breakdown.serviceRevenue,
+                          currency,
+                        ),
+                        _legendItem(
+                          'Manual',
+                          AppColors.midGrey,
+                          breakdown.manualCount,
+                          breakdown.manualRevenue,
+                          currency,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<PieChartSectionData> _buildPieSections(
+    SaleSourceBreakdown breakdown,
+  ) {
+    final total = breakdown.totalCount.toDouble();
+    if (total == 0) {
+      return [];
+    }
+
+    final sections = <PieChartSectionData>[];
+
+    if (breakdown.stockCount > 0) {
+      sections.add(
+        PieChartSectionData(
+          value: breakdown.stockCount.toDouble(),
+          color: AppColors.success,
+          title:
+              '${((breakdown.stockCount / total) * 100).toStringAsFixed(0)}%',
+          titleStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          radius: 50,
+        ),
+      );
+    }
+
+    if (breakdown.spotBuyCount > 0) {
+      sections.add(
+        PieChartSectionData(
+          value: breakdown.spotBuyCount.toDouble(),
+          color: AppColors.warning,
+          title:
+              '${((breakdown.spotBuyCount / total) * 100).toStringAsFixed(0)}%',
+          titleStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          radius: 50,
+        ),
+      );
+    }
+
+    if (breakdown.serviceCount > 0) {
+      sections.add(
+        PieChartSectionData(
+          value: breakdown.serviceCount.toDouble(),
+          color: const Color(0xFF9C27B0),
+          title:
+              '${((breakdown.serviceCount / total) * 100).toStringAsFixed(0)}%',
+          titleStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          radius: 50,
+        ),
+      );
+    }
+
+    if (breakdown.manualCount > 0) {
+      sections.add(
+        PieChartSectionData(
+          value: breakdown.manualCount.toDouble(),
+          color: AppColors.midGrey,
+          title:
+              '${((breakdown.manualCount / total) * 100).toStringAsFixed(0)}%',
+          titleStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          radius: 50,
+        ),
+      );
+    }
+
+    return sections;
+  }
+
+  Widget _legendItem(
+    String label,
+    Color color,
+    int count,
+    double revenue,
+    String currency,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.black,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  '$count sales | '
+                  '${Formatters.compactCurrency(revenue, currency)}',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.midGrey,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -854,9 +2272,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildExportSection(ReportData data) {
-    final settingsProvider = context.read<SettingsProvider>();
-    final currency = settingsProvider.currencyLabel;
+  Widget _buildExportSection(
+    ReportData data, {
+    required bool isExportingSales,
+    required bool isExportingPurchases,
+    required bool isExportingDebts,
+    required Future<void> Function() onExportSales,
+    required Future<void> Function() onExportPurchases,
+    required Future<void> Function() onExportDebts,
+  }) {
     return VynexCard(
       hasAccent: true,
       child: Column(
@@ -893,70 +2317,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
           VynexButton.primary(
             label: 'Export Sales to Excel',
             icon: Icons.table_chart_rounded,
-            isLoading: _isExportingSales,
-            onPressed: () async {
-              setState(() => _isExportingSales = true);
-              try {
-                await ExportHelper.exportSales(data.allSales, currency);
-              } catch (_) {
-                if (mounted) {
-                  SnackBarHelper.showError(
-                    context,
-                    'Export failed. Please try again.',
-                  );
-                }
-              } finally {
-                if (mounted) {
-                  setState(() => _isExportingSales = false);
-                }
-              }
-            },
+            isLoading: isExportingSales,
+            onPressed: onExportSales,
           ),
           const SizedBox(height: 10),
           VynexButton.secondary(
             label: 'Export Purchases to Excel',
             icon: Icons.shopping_bag_rounded,
-            isLoading: _isExportingPurchases,
-            onPressed: () async {
-              setState(() => _isExportingPurchases = true);
-              try {
-                await ExportHelper.exportPurchases(data.allPurchases, currency);
-              } catch (_) {
-                if (mounted) {
-                  SnackBarHelper.showError(
-                    context,
-                    'Export failed. Please try again.',
-                  );
-                }
-              } finally {
-                if (mounted) {
-                  setState(() => _isExportingPurchases = false);
-                }
-              }
-            },
+            isLoading: isExportingPurchases,
+            onPressed: onExportPurchases,
           ),
           const SizedBox(height: 10),
           VynexButton.secondary(
             label: 'Export Debts to Excel',
             icon: Icons.account_balance_wallet_rounded,
-            isLoading: _isExportingDebts,
-            onPressed: () async {
-              setState(() => _isExportingDebts = true);
-              try {
-                await ExportHelper.exportDebts(currency);
-              } catch (_) {
-                if (mounted) {
-                  SnackBarHelper.showError(
-                    context,
-                    'Export failed. Please try again.',
-                  );
-                }
-              } finally {
-                if (mounted) {
-                  setState(() => _isExportingDebts = false);
-                }
-              }
-            },
+            isLoading: isExportingDebts,
+            onPressed: onExportDebts,
           ),
           const SizedBox(height: 8),
           const Row(

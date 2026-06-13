@@ -19,6 +19,7 @@ class ReportProvider extends ChangeNotifier {
   DateTime? _customTo;
   String _paymentMethodFilter = 'all';
   String _saleTypeFilter = 'all';
+  String _saleSourceFilter = 'all';
 
   ReportData? get data => _data;
   bool get isLoading => _isLoading;
@@ -27,6 +28,7 @@ class ReportProvider extends ChangeNotifier {
   DateTime? get customTo => _customTo;
   String get paymentMethodFilter => _paymentMethodFilter;
   String get saleTypeFilter => _saleTypeFilter;
+  String get saleSourceFilter => _saleSourceFilter;
 
   /// Load report data for the currently selected period.
   Future<void> loadReport() async {
@@ -45,12 +47,14 @@ class ReportProvider extends ChangeNotifier {
         toStr,
         paymentMethodFilter: _paymentMethodFilter,
         saleTypeFilter: _saleTypeFilter,
+        saleSourceFilter: _saleSourceFilter,
       );
       final dailyData = await db.getDailyChartData(
         fromStr,
         toStr,
         paymentMethodFilter: _paymentMethodFilter,
         saleTypeFilter: _saleTypeFilter,
+        saleSourceFilter: _saleSourceFilter,
       );
       final monthlyData = await db.getMonthlyChartData();
       final topItems = await db.getTopItems(
@@ -58,10 +62,23 @@ class ReportProvider extends ChangeNotifier {
         toStr,
         paymentMethodFilter: _paymentMethodFilter,
         saleTypeFilter: _saleTypeFilter,
+        saleSourceFilter: _saleSourceFilter,
       );
       final installmentCount = await db.getInstallmentSalesCount(
         dateFrom: fromStr,
         dateTo: toStr,
+      );
+      final inventoryData = await db.getInventoryReportData();
+      final customerData = await db.getCustomerReportData(
+        dateFrom: fromStr,
+        dateTo: toStr,
+      );
+      final sourceBreakdown = await db.getSaleSourceBreakdown(
+        dateFrom: fromStr,
+        dateTo: toStr,
+        paymentMethodFilter: _paymentMethodFilter,
+        saleTypeFilter: _saleTypeFilter,
+        saleSourceFilter: _saleSourceFilter,
       );
       final allSales = await db.getSales();
       final allPurchases = await db.getPurchases();
@@ -111,6 +128,9 @@ class ReportProvider extends ChangeNotifier {
         installmentSalesCount: installmentCount,
         allSales: allSales,
         allPurchases: allPurchases,
+        inventoryData: inventoryData,
+        customerData: customerData,
+        sourceBreakdown: sourceBreakdown,
       );
     } catch (e) {
       logDebug('Error loading report: $e');
@@ -129,6 +149,12 @@ class ReportProvider extends ChangeNotifier {
   /// Set sale type filter and reload report.
   Future<void> setSaleTypeFilter(String type) async {
     _saleTypeFilter = type;
+    await loadReport();
+  }
+
+  /// Set sale source filter and reload report.
+  Future<void> setSaleSourceFilter(String filter) async {
+    _saleSourceFilter = filter;
     await loadReport();
   }
 

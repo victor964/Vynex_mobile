@@ -106,7 +106,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Business Manager',
+                        'Business Manager V2',
                         style: TextStyle(
                           color: AppColors.midGrey,
                           fontSize: 14,
@@ -135,7 +135,7 @@ class _SplashScreenState extends State<SplashScreen> {
               const Padding(
                 padding: EdgeInsets.only(bottom: 24),
                 child: Text(
-                  'Version 1.0.0',
+                  'Version 2.0.0',
                   style: TextStyle(
                     color: AppColors.darkGrey,
                     fontSize: 11,

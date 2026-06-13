@@ -5,6 +5,7 @@ import '../core/utils/debug_log.dart';
 
 import '../core/database/database_helper.dart';
 import '../models/purchase.dart';
+import '../models/stock_movement.dart';
 
 /// Manages purchase list state and CRUD operations.
 class PurchaseProvider extends ChangeNotifier {
@@ -44,7 +45,33 @@ class PurchaseProvider extends ChangeNotifier {
   Future<bool> addPurchase(Purchase purchase) async {
     try {
       final db = DatabaseHelper();
-      await db.insertPurchase(purchase);
+      final newId = await db.insertPurchase(purchase);
+
+      if (purchase.purchaseType == 'restock' &&
+          purchase.productId != null) {
+        final product =
+            await db.getProductById(purchase.productId!);
+        if (product != null) {
+          final newStock =
+              product.currentStock + purchase.quantity;
+          await db.updateProductStock(
+            purchase.productId!,
+            newStock,
+          );
+          await db.insertStockMovement(
+            StockMovement(
+              productId: purchase.productId!,
+              movementType: 'restock',
+              quantity: purchase.quantity,
+              referenceId: newId,
+              referenceType: 'purchase',
+              note: 'Purchase: ${purchase.itemName}',
+              dateRecorded: purchase.datePurchased,
+            ),
+          );
+        }
+      }
+
       await loadPurchases();
       return true;
     } catch (e) {

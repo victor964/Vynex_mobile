@@ -11,6 +11,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/dashboard_data.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/debt_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../widgets/common/confirm_dialog.dart';
 import '../../widgets/common/stat_card.dart';
@@ -49,6 +50,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       await context.read<SettingsProvider>().loadSettings();
+      if (!mounted) return;
+      await context.read<DebtProvider>().loadDebts();
+      if (!mounted) return;
       final data = await DatabaseHelper().getDashboardData();
       if (mounted) {
         setState(() {
@@ -131,6 +135,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildContent(BuildContext context, String currency) {
     final data = _data!;
+    final pendingDebts = context.watch<DebtProvider>().pendingCount;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -187,6 +192,184 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ),
+        if (data.totalCatalogProducts > 0) ...[
+          const SizedBox(height: 12),
+          VynexCard(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.inventory_2_rounded,
+                        color: AppColors.gold,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Inventory Status',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: AppColors.black,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () => context.go(AppRoutes.inventory),
+                        child: const Text(
+                          'View All',
+                          style: TextStyle(
+                            color: AppColors.gold,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _miniInventoryStat(
+                        label: 'In Stock',
+                        value:
+                            '${data.totalCatalogProducts - data.lowStockCount - data.outOfStockCount}',
+                        color: AppColors.success,
+                      ),
+                      const SizedBox(width: 12),
+                      _miniInventoryStat(
+                        label: 'Low Stock',
+                        value: '${data.lowStockCount}',
+                        color: data.lowStockCount > 0
+                            ? AppColors.warning
+                            : AppColors.midGrey,
+                      ),
+                      const SizedBox(width: 12),
+                      _miniInventoryStat(
+                        label: 'Out of Stock',
+                        value: '${data.outOfStockCount}',
+                        color: data.outOfStockCount > 0
+                            ? AppColors.danger
+                            : AppColors.midGrey,
+                      ),
+                    ],
+                  ),
+                  if (data.outOfStockCount > 0 ||
+                      data.lowStockCount > 0) ...[
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => context.go(AppRoutes.inventory),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: AppColors.warning,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              color: AppColors.warning,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${data.outOfStockCount} out of stock, '
+                              '${data.lowStockCount} low. '
+                              'Tap to restock.',
+                              style: const TextStyle(
+                                color: AppColors.warning,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+        if (data.totalCustomers > 0) ...[
+          const SizedBox(height: 12),
+          VynexCard(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.people_rounded,
+                    color: AppColors.gold,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${data.totalCustomers} Customers',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppColors.black,
+                    ),
+                  ),
+                  if (data.customersWithDebt > 0) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.danger,
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        '${data.customersWithDebt} with debt',
+                        style: const TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => context.go(AppRoutes.customers),
+                    child: const Text(
+                      'View All',
+                      style: TextStyle(
+                        color: AppColors.gold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         Row(
           children: [
@@ -208,6 +391,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: '+ Sale',
                 icon: Icons.add_circle_outline,
                 onTap: () => context.push(AppRoutes.addSale),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _MoreActionButton(
+                label: 'Purchases',
+                onTap: () => context.go(AppRoutes.purchases),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _MoreActionButton(
+                label: 'Debts',
+                badgeCount: pendingDebts,
+                onTap: () => context.go(AppRoutes.debts),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.go(AppRoutes.inventory),
+                icon: const Icon(
+                  Icons.inventory_2_rounded,
+                  color: AppColors.gold,
+                  size: 16,
+                ),
+                label: const Text(
+                  'Inventory',
+                  style: TextStyle(
+                    color: AppColors.gold,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(
+                    color: AppColors.gold,
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
               ),
             ),
           ],
@@ -319,6 +553,87 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         const SizedBox(height: 16),
       ],
+    );
+  }
+}
+
+Widget _miniInventoryStat({
+  required String label,
+  required String value,
+  required Color color,
+}) {
+  return Expanded(
+    child: Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppColors.midGrey,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _MoreActionButton extends StatelessWidget {
+  const _MoreActionButton({
+    required this.label,
+    required this.onTap,
+    this.badgeCount = 0,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final int badgeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.gold,
+          side: const BorderSide(color: AppColors.gold),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+        ),
+        child: badgeCount > 0
+            ? Badge(
+                isLabelVisible: true,
+                label: Text(
+                  badgeCount > 9 ? '9+' : '$badgeCount',
+                  style: const TextStyle(fontSize: 9),
+                ),
+                backgroundColor: AppColors.danger,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )
+            : Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+      ),
     );
   }
 }

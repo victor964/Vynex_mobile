@@ -8,9 +8,14 @@ import 'core/theme/app_theme.dart';
 /// Root widget for the Vynex application.
 class VynexApp extends StatelessWidget {
   /// Creates the Vynex app widget.
-  const VynexApp({super.key, required this.router});
+  const VynexApp({
+    super.key,
+    required this.router,
+    this.showOnboarding = false,
+  });
 
   final GoRouter router;
+  final bool showOnboarding;
 
   @override
   Widget build(BuildContext context) {

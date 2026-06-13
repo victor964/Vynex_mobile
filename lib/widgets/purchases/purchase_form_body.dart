@@ -29,6 +29,8 @@ class PurchaseFormBody extends StatelessWidget {
     required this.onCancel,
     required this.onUpdatePreview,
     required this.onDateSelected,
+    this.itemNameReadOnly = false,
+    this.itemNameHelperText,
   });
 
   final GlobalKey<FormState> formKey;
@@ -45,6 +47,8 @@ class PurchaseFormBody extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onUpdatePreview;
   final ValueChanged<DateTime> onDateSelected;
+  final bool itemNameReadOnly;
+  final String? itemNameHelperText;
 
   bool _isToday(DateTime date) {
     final now = DateTime.now();
@@ -102,8 +106,20 @@ class PurchaseFormBody extends StatelessWidget {
             hint: 'e.g. Maize Flour 2kg',
             controller: itemNameController,
             textCapitalization: TextCapitalization.words,
+            readOnly: itemNameReadOnly,
             validator: (v) => Validators.required(v, 'Item name'),
           ),
+          if (itemNameHelperText != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              itemNameHelperText!,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.midGrey,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           VynexTextField(
             label: 'Quantity',

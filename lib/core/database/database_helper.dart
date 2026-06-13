@@ -5,11 +5,18 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../models/business_settings.dart';
+import '../../models/category.dart';
+import '../../models/customer.dart';
+import '../../models/customer_history.dart';
 import '../../models/dashboard_data.dart';
 import '../../models/debt.dart';
 import '../../models/debt_with_sale.dart';
+import '../../models/invoice.dart';
+import '../../models/product.dart';
 import '../../models/purchase.dart';
+import '../../models/report_data.dart';
 import '../../models/sale.dart';
+import '../../models/stock_movement.dart';
 import '../utils/formatters.dart';
 
 /// Singleton helper for all local SQLite database operations.
@@ -24,7 +31,7 @@ class DatabaseHelper {
   static Database? _database;
 
   static const String _dbName = 'vynex.db';
-  static const int _dbVersion = 3;
+  static const int _dbVersion = 4;
 
   /// Opens or returns the cached database connection.
   Future<Database> get database async {
@@ -85,6 +92,228 @@ class DatabaseHelper {
         'sale_type TEXT NOT NULL DEFAULT "product"',
       );
     }
+
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE sales ADD COLUMN product_id INTEGER',
+      );
+      await db.execute(
+        'ALTER TABLE sales ADD COLUMN '
+        'sale_source TEXT NOT NULL DEFAULT "manual"',
+      );
+      await db.execute(
+        'ALTER TABLE sales ADD COLUMN customer_id INTEGER',
+      );
+      await db.execute(
+        'ALTER TABLE sales ADD COLUMN spot_cost REAL',
+      );
+
+      await db.execute(
+        'ALTER TABLE purchases ADD COLUMN product_id INTEGER',
+      );
+      await db.execute(
+        'ALTER TABLE purchases ADD COLUMN '
+        'purchase_type TEXT NOT NULL DEFAULT "general"',
+      );
+
+      await db.execute(
+        'ALTER TABLE debts ADD COLUMN customer_id INTEGER',
+      );
+
+      await _createV2Tables(db);
+      await _seedPredefinedCategories(db);
+    }
+
+    await _createV2Indexes(db);
+  }
+
+  Future<void> _createV2Indexes(Database db) async {
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_sales_customer '
+      'ON sales(customer_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_sales_product '
+      'ON sales(product_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_debts_customer '
+      'ON debts(customer_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_movements_product '
+      'ON stock_movements(product_id)',
+    );
+  }
+
+  /// True when the database has business data (V1 upgrade skip onboarding).
+  Future<bool> hasExistingUserData() async {
+    try {
+      final db = await database;
+      for (final table in [
+        'sales',
+        'purchases',
+        'products',
+        'customers',
+      ]) {
+        final count = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM $table'),
+        );
+        if ((count ?? 0) > 0) return true;
+      }
+      return false;
+    } catch (e) {
+      logDebug('DatabaseHelper.hasExistingUserData error: $e');
+      return false;
+    }
+  }
+
+  Future<void> _createV2Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        color_hex TEXT NOT NULL DEFAULT 'FFD700',
+        icon_name TEXT NOT NULL DEFAULT 'category',
+        is_predefined INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        category_id INTEGER,
+        barcode TEXT,
+        default_cost_price REAL NOT NULL DEFAULT 0,
+        default_selling_price REAL NOT NULL DEFAULT 0,
+        current_stock INTEGER NOT NULL DEFAULT 0,
+        low_stock_threshold INTEGER NOT NULL DEFAULT 5,
+        unit TEXT NOT NULL DEFAULT 'piece',
+        description TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        date_added TEXT NOT NULL,
+        last_updated TEXT NOT NULL,
+        FOREIGN KEY (category_id)
+          REFERENCES categories(id) ON DELETE SET NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS stock_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        movement_type TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        reference_id INTEGER,
+        reference_type TEXT,
+        note TEXT,
+        date_recorded TEXT NOT NULL,
+        FOREIGN KEY (product_id)
+          REFERENCES products(id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS customers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        phone TEXT,
+        email TEXT,
+        notes TEXT,
+        date_added TEXT NOT NULL,
+        last_updated TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS invoices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_number TEXT NOT NULL UNIQUE,
+        sale_id INTEGER,
+        customer_id INTEGER,
+        customer_name TEXT NOT NULL,
+        customer_phone TEXT,
+        subtotal REAL NOT NULL,
+        total REAL NOT NULL,
+        notes TEXT,
+        date_issued TEXT NOT NULL,
+        FOREIGN KEY (sale_id)
+          REFERENCES sales(id) ON DELETE SET NULL,
+        FOREIGN KEY (customer_id)
+          REFERENCES customers(id) ON DELETE SET NULL
+      )
+    ''');
+  }
+
+  Future<void> _seedPredefinedCategories(Database db) async {
+    final predefined = [
+      {
+        'name': 'Cables and Chargers',
+        'color_hex': 'FFD700',
+        'icon_name': 'cable',
+        'is_predefined': 1,
+        'sort_order': 1,
+      },
+      {
+        'name': 'Phone Cases',
+        'color_hex': '4CAF50',
+        'icon_name': 'phone_android',
+        'is_predefined': 1,
+        'sort_order': 2,
+      },
+      {
+        'name': 'Bulbs and Lighting',
+        'color_hex': 'FFC107',
+        'icon_name': 'lightbulb',
+        'is_predefined': 1,
+        'sort_order': 3,
+      },
+      {
+        'name': 'Computer Accessories',
+        'color_hex': '2196F3',
+        'icon_name': 'computer',
+        'is_predefined': 1,
+        'sort_order': 4,
+      },
+      {
+        'name': 'Repair Services',
+        'color_hex': 'FF5722',
+        'icon_name': 'build',
+        'is_predefined': 1,
+        'sort_order': 5,
+      },
+      {
+        'name': 'Printing',
+        'color_hex': '9C27B0',
+        'icon_name': 'print',
+        'is_predefined': 1,
+        'sort_order': 6,
+      },
+      {
+        'name': 'Stationery',
+        'color_hex': '00BCD4',
+        'icon_name': 'edit',
+        'is_predefined': 1,
+        'sort_order': 7,
+      },
+      {
+        'name': 'Other',
+        'color_hex': '607D8B',
+        'icon_name': 'category',
+        'is_predefined': 1,
+        'sort_order': 8,
+      },
+    ];
+
+    for (final cat in predefined) {
+      await db.insert(
+        'categories',
+        cat,
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -96,7 +325,9 @@ class DatabaseHelper {
         cost_price REAL NOT NULL,
         total_cost REAL NOT NULL,
         date_purchased TEXT NOT NULL,
-        notes TEXT
+        notes TEXT,
+        product_id INTEGER,
+        purchase_type TEXT NOT NULL DEFAULT 'general'
       )
     ''');
 
@@ -113,7 +344,11 @@ class DatabaseHelper {
         debt_note TEXT,
         date_sold TEXT NOT NULL,
         payment_method TEXT NOT NULL DEFAULT 'cash',
-        sale_type TEXT NOT NULL DEFAULT 'product'
+        sale_type TEXT NOT NULL DEFAULT 'product',
+        product_id INTEGER,
+        sale_source TEXT NOT NULL DEFAULT 'manual',
+        customer_id INTEGER,
+        spot_cost REAL
       )
     ''');
 
@@ -130,6 +365,7 @@ class DatabaseHelper {
         last_updated TEXT NOT NULL,
         collected_revenue REAL NOT NULL DEFAULT 0,
         payment_history TEXT,
+        customer_id INTEGER,
         FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
       )
     ''');
@@ -146,6 +382,9 @@ class DatabaseHelper {
       )
     ''');
 
+    await _createV2Tables(db);
+    await _seedPredefinedCategories(db);
+    await _createV2Indexes(db);
     await initSettings(db);
   }
 
@@ -425,6 +664,7 @@ class DatabaseHelper {
   String _reportFilterClause({
     String paymentMethodFilter = 'all',
     String saleTypeFilter = 'all',
+    String saleSourceFilter = 'all',
   }) {
     var clause = '';
     if (paymentMethodFilter != 'all') {
@@ -432,6 +672,9 @@ class DatabaseHelper {
     }
     if (saleTypeFilter != 'all') {
       clause += " AND sale_type = '$saleTypeFilter'";
+    }
+    if (saleSourceFilter != 'all') {
+      clause += " AND sale_source = '$saleSourceFilter'";
     }
     return clause;
   }
@@ -442,12 +685,14 @@ class DatabaseHelper {
     String dateTo, {
     String paymentMethodFilter = 'all',
     String saleTypeFilter = 'all',
+    String saleSourceFilter = 'all',
   }) async {
     try {
       final db = await database;
       final filter = _reportFilterClause(
         paymentMethodFilter: paymentMethodFilter,
         saleTypeFilter: saleTypeFilter,
+        saleSourceFilter: saleSourceFilter,
       );
       final result = await db.rawQuery(
         '''
@@ -528,12 +773,14 @@ class DatabaseHelper {
     int limit = 10,
     String paymentMethodFilter = 'all',
     String saleTypeFilter = 'all',
+    String saleSourceFilter = 'all',
   }) async {
     try {
       final db = await database;
       final filter = _reportFilterClause(
         paymentMethodFilter: paymentMethodFilter,
         saleTypeFilter: saleTypeFilter,
+        saleSourceFilter: saleSourceFilter,
       );
       final result = await db.rawQuery(
         '''
@@ -601,12 +848,14 @@ class DatabaseHelper {
     String dateTo, {
     String paymentMethodFilter = 'all',
     String saleTypeFilter = 'all',
+    String saleSourceFilter = 'all',
   }) async {
     try {
       final db = await database;
       final filter = _reportFilterClause(
         paymentMethodFilter: paymentMethodFilter,
         saleTypeFilter: saleTypeFilter,
+        saleSourceFilter: saleSourceFilter,
       );
 
       final salesResult = await db.rawQuery(
@@ -1027,6 +1276,9 @@ class DatabaseHelper {
       );
       final recentPurchases = purchaseMaps.map(Purchase.fromMap).toList();
 
+      final inventorySummary = await getInventorySummary();
+      final customerStats = await getCustomerStats();
+
       return DashboardData(
         totalPurchases: purchaseCount,
         totalSales: saleCount,
@@ -1037,6 +1289,16 @@ class DatabaseHelper {
         monthSpent: monthSpent,
         recentSales: recentSales,
         recentPurchases: recentPurchases,
+        totalCatalogProducts:
+            inventorySummary['total_products'] as int,
+        lowStockCount: inventorySummary['low_stock_count'] as int,
+        outOfStockCount:
+            inventorySummary['out_of_stock_count'] as int,
+        totalInventoryValue:
+            inventorySummary['total_inventory_value'] as double,
+        totalCustomers: customerStats['total_customers'] as int,
+        customersWithDebt:
+            customerStats['customers_with_debt'] as int,
       );
     } catch (e) {
       logDebug('DatabaseHelper.getDashboardData error: $e');
@@ -1049,6 +1311,905 @@ class DatabaseHelper {
     if (_database != null && _database!.isOpen) {
       await _database!.close();
       _database = null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // V2 Category CRUD
+  // ---------------------------------------------------------------------------
+
+  Future<List<Category>> getCategories() async {
+    final db = await database;
+    final maps = await db.query(
+      'categories',
+      orderBy: 'sort_order ASC, name ASC',
+    );
+    return maps.map((m) => Category.fromMap(m)).toList();
+  }
+
+  Future<int> insertCategory(Category category) async {
+    final db = await database;
+    return db.insert('categories', category.toMap());
+  }
+
+  Future<int> updateCategory(Category category) async {
+    final db = await database;
+    return db.update(
+      'categories',
+      category.toMap(),
+      where: 'id = ?',
+      whereArgs: [category.id],
+    );
+  }
+
+  Future<int> deleteCategory(int id) async {
+    final db = await database;
+    return db.delete(
+      'categories',
+      where: 'id = ? AND is_predefined = 0',
+      whereArgs: [id],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // V2 Product CRUD
+  // ---------------------------------------------------------------------------
+
+  Future<List<Product>> getProducts() async {
+    final db = await database;
+    final maps = await db.query(
+      'products',
+      where: 'is_active = 1',
+      orderBy: 'name ASC',
+    );
+    return maps.map((m) => Product.fromMap(m)).toList();
+  }
+
+  Future<int> insertProduct(Product product) async {
+    final db = await database;
+    return db.insert(
+      'products',
+      product.toMap()..remove('id'),
+    );
+  }
+
+  Future<int> updateProduct(Product product) async {
+    final db = await database;
+    return db.update(
+      'products',
+      product.toMap(),
+      where: 'id = ?',
+      whereArgs: [product.id],
+    );
+  }
+
+  Future<Product?> getProductByBarcode(String barcode) async {
+    final db = await database;
+    final maps = await db.query(
+      'products',
+      where: 'barcode = ? AND is_active = 1',
+      whereArgs: [barcode],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Product.fromMap(maps.first);
+  }
+
+  Future<Product?> getProductById(int id) async {
+    final db = await database;
+    final maps = await db.query(
+      'products',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Product.fromMap(maps.first);
+  }
+
+  /// Search products by name or barcode.
+  Future<List<Product>> searchProducts(String query) async {
+    final db = await database;
+    final maps = await db.query(
+      'products',
+      where: 'is_active = 1 AND '
+          '(name LIKE ? OR barcode LIKE ?)',
+      whereArgs: ['%$query%', '%$query%'],
+      orderBy: 'name ASC',
+    );
+    return maps.map((m) => Product.fromMap(m)).toList();
+  }
+
+  /// Get products with low or zero stock.
+  Future<List<Product>> getLowStockProducts() async {
+    final db = await database;
+    final maps = await db.query(
+      'products',
+      where: 'is_active = 1 AND '
+          'current_stock <= low_stock_threshold',
+      orderBy: 'current_stock ASC',
+    );
+    return maps.map((m) => Product.fromMap(m)).toList();
+  }
+
+  /// Update stock quantity directly.
+  Future<void> updateProductStock(
+    int productId,
+    int newStock,
+  ) async {
+    final db = await database;
+    final today = DateTime.now()
+        .toIso8601String()
+        .substring(0, 10);
+    await db.update(
+      'products',
+      {
+        'current_stock': newStock,
+        'last_updated': today,
+      },
+      where: 'id = ?',
+      whereArgs: [productId],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // V2 Customer CRUD
+  // ---------------------------------------------------------------------------
+
+  Future<List<Customer>> getCustomers() async {
+    final db = await database;
+    final maps = await db.query(
+      'customers',
+      orderBy: 'name ASC',
+    );
+    return maps.map((m) => Customer.fromMap(m)).toList();
+  }
+
+  Future<int> insertCustomer(Customer customer) async {
+    final db = await database;
+    return db.insert(
+      'customers',
+      customer.toMap()..remove('id'),
+    );
+  }
+
+  Future<int> updateCustomer(Customer customer) async {
+    final db = await database;
+    return db.update(
+      'customers',
+      customer.toMap(),
+      where: 'id = ?',
+      whereArgs: [customer.id],
+    );
+  }
+
+  Future<Customer?> getCustomerById(int id) async {
+    final db = await database;
+    final maps = await db.query(
+      'customers',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Customer.fromMap(maps.first);
+  }
+
+  /// Delete a customer and unlink from sales and debts.
+  Future<void> deleteCustomer(int id) async {
+    final db = await database;
+    await db.update(
+      'sales',
+      {'customer_id': null},
+      where: 'customer_id = ?',
+      whereArgs: [id],
+    );
+    await db.update(
+      'debts',
+      {'customer_id': null},
+      where: 'customer_id = ?',
+      whereArgs: [id],
+    );
+    await db.delete(
+      'customers',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Get complete customer history including sales,
+  /// debts, stats and favorite items.
+  Future<CustomerHistory> getCustomerHistory(
+    int customerId,
+  ) async {
+    final db = await database;
+
+    final salesMaps = await db.query(
+      'sales',
+      where: 'customer_id = ?',
+      whereArgs: [customerId],
+      orderBy: 'date_sold DESC',
+    );
+    final sales = salesMaps.map((m) => Sale.fromMap(m)).toList();
+
+    final spentResult = await db.rawQuery('''
+      SELECT COALESCE(SUM(total_revenue), 0) as total
+      FROM sales
+      WHERE customer_id = ? AND is_fully_paid = 1
+    ''', [customerId]);
+    final totalSpent =
+        (spentResult.first['total'] as num?)?.toDouble() ?? 0.0;
+
+    final debtsMaps = await db.query(
+      'debts',
+      where: 'customer_id = ? AND is_cleared = 0',
+      whereArgs: [customerId],
+      orderBy: 'date_created DESC',
+    );
+    final activeDebts = debtsMaps.map((m) => Debt.fromMap(m)).toList();
+
+    final balanceResult = await db.rawQuery('''
+      SELECT COALESCE(SUM(balance), 0) as total
+      FROM debts
+      WHERE customer_id = ? AND is_cleared = 0
+    ''', [customerId]);
+    final outstandingBalance =
+        (balanceResult.first['total'] as num?)?.toDouble() ?? 0.0;
+
+    final lastPurchase =
+        sales.isNotEmpty ? sales.first.dateSold : null;
+
+    final favResult = await db.rawQuery('''
+      SELECT
+        item_name,
+        COUNT(*) as purchase_count,
+        SUM(quantity_sold) as total_qty,
+        SUM(total_revenue) as total_spent
+      FROM sales
+      WHERE customer_id = ?
+      GROUP BY item_name
+      ORDER BY total_qty DESC
+      LIMIT 5
+    ''', [customerId]);
+
+    final favoriteItems = favResult.map((row) {
+      return {
+        'item_name': row['item_name'] as String,
+        'purchase_count': row['purchase_count'] as int,
+        'total_qty': row['total_qty'] as int,
+        'total_spent': (row['total_spent'] as num).toDouble(),
+      };
+    }).toList();
+
+    return CustomerHistory(
+      customerId: customerId,
+      totalSalesCount: sales.length,
+      totalAmountSpent: totalSpent,
+      outstandingDebtBalance: outstandingBalance,
+      lastPurchaseDate: lastPurchase,
+      recentSales: sales,
+      activeDebts: activeDebts,
+      favoriteItems: favoriteItems,
+    );
+  }
+
+  /// Get all sales linked to a customer.
+  Future<List<Sale>> getCustomerSales(int customerId) async {
+    final db = await database;
+    final maps = await db.query(
+      'sales',
+      where: 'customer_id = ?',
+      whereArgs: [customerId],
+      orderBy: 'date_sold DESC',
+    );
+    return maps.map((m) => Sale.fromMap(m)).toList();
+  }
+
+  /// Get all debts linked to a customer with sale item names.
+  Future<List<DebtWithSale>> getCustomerDebts(
+    int customerId, {
+    bool clearedOnly = false,
+    bool activeOnly = false,
+  }) async {
+    final db = await database;
+    var where = 'd.customer_id = ?';
+    final args = <Object>[customerId];
+    if (clearedOnly) {
+      where += ' AND d.is_cleared = 1';
+    } else if (activeOnly) {
+      where += ' AND d.is_cleared = 0';
+    }
+    final maps = await db.rawQuery('''
+      SELECT d.*, s.item_name as sale_item_name,
+             s.date_sold as sale_date_sold,
+             s.total_revenue as sale_revenue
+      FROM debts d
+      LEFT JOIN sales s ON d.sale_id = s.id
+      WHERE $where
+      ORDER BY d.date_created DESC
+    ''', args);
+    return maps.map((m) {
+      final debtMap = Map<String, dynamic>.from(m);
+      final itemName = debtMap.remove('sale_item_name') as String? ?? '';
+      final dateSold =
+          debtMap.remove('sale_date_sold') as String? ?? '';
+      final saleRevenue =
+          (debtMap.remove('sale_revenue') as num?)?.toDouble() ?? 0.0;
+      return DebtWithSale(
+        debt: Debt.fromMap(debtMap),
+        itemName: itemName.isEmpty ? 'Unknown item' : itemName,
+        dateSold: dateSold,
+        saleRevenue: saleRevenue,
+      );
+    }).toList();
+  }
+
+  /// Link a sale to a customer.
+  Future<void> linkSaleToCustomer(
+    int saleId,
+    int customerId,
+  ) async {
+    final db = await database;
+    await db.update(
+      'sales',
+      {'customer_id': customerId},
+      where: 'id = ?',
+      whereArgs: [saleId],
+    );
+  }
+
+  /// Link a debt to a customer (when sale has customer).
+  Future<void> linkDebtToCustomer(
+    int debtId,
+    int customerId,
+  ) async {
+    final db = await database;
+    await db.update(
+      'debts',
+      {'customer_id': customerId},
+      where: 'id = ?',
+      whereArgs: [debtId],
+    );
+  }
+
+  /// Last purchase date per customer (single query).
+  Future<Map<int, String>> getCustomerLastPurchaseDates() async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT customer_id,
+             MAX(date_sold) as last_date
+      FROM sales
+      WHERE customer_id IS NOT NULL
+      GROUP BY customer_id
+    ''');
+    return {
+      for (final row in result)
+        row['customer_id'] as int: row['last_date'] as String,
+    };
+  }
+
+  /// Customer ids with outstanding debt.
+  Future<Set<int>> getCustomerIdsWithOutstandingDebt() async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT DISTINCT customer_id as id
+      FROM debts
+      WHERE customer_id IS NOT NULL
+        AND is_cleared = 0
+    ''');
+    return result.map((r) => r['id'] as int).toSet();
+  }
+
+  /// Get customer stats for dashboard.
+  Future<Map<String, dynamic>> getCustomerStats() async {
+    final db = await database;
+
+    final totalResult = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM customers',
+    );
+    final total = Sqflite.firstIntValue(totalResult) ?? 0;
+
+    final withDebtResult = await db.rawQuery('''
+      SELECT COUNT(DISTINCT customer_id) as count
+      FROM debts
+      WHERE customer_id IS NOT NULL
+        AND is_cleared = 0
+    ''');
+    final withDebt = Sqflite.firstIntValue(withDebtResult) ?? 0;
+
+    return {
+      'total_customers': total,
+      'customers_with_debt': withDebt,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // V2 Stock movement CRUD
+  // ---------------------------------------------------------------------------
+
+  Future<int> insertStockMovement(StockMovement movement) async {
+    final db = await database;
+    return db.insert(
+      'stock_movements',
+      movement.toMap()..remove('id'),
+    );
+  }
+
+  /// Get all stock movements for a product, newest first.
+  Future<List<StockMovement>> getStockMovements(
+    int productId, {
+    int? limit,
+  }) async {
+    final db = await database;
+    final maps = await db.query(
+      'stock_movements',
+      where: 'product_id = ?',
+      whereArgs: [productId],
+      orderBy: 'date_recorded DESC, id DESC',
+      limit: limit,
+    );
+    return maps.map((m) => StockMovement.fromMap(m)).toList();
+  }
+
+  /// Get total number of stock movements for a product.
+  Future<int> getStockMovementCount(int productId) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM stock_movements '
+      'WHERE product_id = ?',
+      [productId],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// Get all products sorted by stock level ascending.
+  /// Products with lowest stock appear first.
+  Future<List<Product>> getProductsByStockLevel() async {
+    final db = await database;
+    final maps = await db.query(
+      'products',
+      where: 'is_active = 1',
+      orderBy: 'current_stock ASC, name ASC',
+    );
+    return maps.map((m) => Product.fromMap(m)).toList();
+  }
+
+  /// Get inventory summary stats.
+  Future<Map<String, dynamic>> getInventorySummary() async {
+    final db = await database;
+
+    final totalResult = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM products '
+      'WHERE is_active = 1',
+    );
+    final totalProducts = Sqflite.firstIntValue(totalResult) ?? 0;
+
+    final lowResult = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM products '
+      'WHERE is_active = 1 '
+      'AND current_stock <= low_stock_threshold '
+      'AND current_stock > 0',
+    );
+    final lowStockCount = Sqflite.firstIntValue(lowResult) ?? 0;
+
+    final outResult = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM products '
+      'WHERE is_active = 1 AND current_stock = 0',
+    );
+    final outOfStockCount = Sqflite.firstIntValue(outResult) ?? 0;
+
+    final valueResult = await db.rawQuery(
+      'SELECT SUM(current_stock * default_cost_price) '
+      'as total_value FROM products WHERE is_active = 1',
+    );
+    final totalValue =
+        (valueResult.first['total_value'] as num?)?.toDouble() ?? 0.0;
+
+    final retailResult = await db.rawQuery(
+      'SELECT SUM(current_stock * default_selling_price) '
+      'as retail_value FROM products WHERE is_active = 1',
+    );
+    final retailValue =
+        (retailResult.first['retail_value'] as num?)?.toDouble() ?? 0.0;
+
+    return {
+      'total_products': totalProducts,
+      'low_stock_count': lowStockCount,
+      'out_of_stock_count': outOfStockCount,
+      'total_inventory_value': totalValue,
+      'total_retail_value': retailValue,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // V2 Invoice CRUD
+  // ---------------------------------------------------------------------------
+
+  Future<int> insertInvoice(Invoice invoice) async {
+    final db = await database;
+    return db.insert(
+      'invoices',
+      invoice.toMap()..remove('id'),
+    );
+  }
+
+  Future<List<Invoice>> getInvoices() async {
+    final db = await database;
+    final maps = await db.query(
+      'invoices',
+      orderBy: 'date_issued DESC, id DESC',
+    );
+    return maps.map((m) => Invoice.fromMap(m)).toList();
+  }
+
+  Future<int> getInvoiceCount() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM invoices',
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<Invoice?> getInvoiceById(int id) async {
+    final db = await database;
+    final maps = await db.query(
+      'invoices',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Invoice.fromMap(maps.first);
+  }
+
+  Future<List<Invoice>> getInvoicesForSale(
+    int saleId,
+  ) async {
+    final db = await database;
+    final maps = await db.query(
+      'invoices',
+      where: 'sale_id = ?',
+      whereArgs: [saleId],
+      orderBy: 'date_issued DESC',
+    );
+    return maps.map((m) => Invoice.fromMap(m)).toList();
+  }
+
+  Future<List<Invoice>> getInvoicesForCustomer(
+    int customerId,
+  ) async {
+    final db = await database;
+    final maps = await db.query(
+      'invoices',
+      where: 'customer_id = ?',
+      whereArgs: [customerId],
+      orderBy: 'date_issued DESC',
+    );
+    return maps.map((m) => Invoice.fromMap(m)).toList();
+  }
+
+  Future<int> deleteInvoice(int id) async {
+    final db = await database;
+    return db.delete(
+      'invoices',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Get inventory report data.
+  Future<InventoryReportData> getInventoryReportData() async {
+    try {
+      final db = await database;
+
+      final allProducts = await db.query(
+        'products',
+        where: 'is_active = 1',
+      );
+
+      var inStock = 0;
+      var lowStock = 0;
+      var outOfStock = 0;
+      var costValue = 0.0;
+      var retailValue = 0.0;
+
+      for (final p in allProducts) {
+        final stock = p['current_stock'] as int;
+        final threshold = p['low_stock_threshold'] as int;
+        final cost = (p['default_cost_price'] as num).toDouble();
+        final retail = (p['default_selling_price'] as num).toDouble();
+
+        costValue += stock * cost;
+        retailValue += stock * retail;
+
+        if (stock == 0) {
+          outOfStock++;
+        } else if (stock <= threshold) {
+          lowStock++;
+        } else {
+          inStock++;
+        }
+      }
+
+      final potentialProfit = retailValue - costValue;
+
+      final lowMaps = await db.rawQuery('''
+        SELECT id, name, current_stock,
+               low_stock_threshold, unit
+        FROM products
+        WHERE is_active = 1
+          AND current_stock <= low_stock_threshold
+        ORDER BY current_stock ASC
+        LIMIT 20
+      ''');
+      final lowStockItems = lowMaps
+          .map(
+            (m) => LowStockItem(
+              productId: m['id'] as int,
+              productName: m['name'] as String,
+              currentStock: m['current_stock'] as int,
+              threshold: m['low_stock_threshold'] as int,
+              unit: m['unit'] as String? ?? 'piece',
+            ),
+          )
+          .toList();
+
+      final thirtyDaysAgo = DateTime.now()
+          .subtract(const Duration(days: 30))
+          .toIso8601String()
+          .substring(0, 10);
+
+      final deadMaps = await db.rawQuery('''
+        SELECT p.id, p.name, p.current_stock,
+               p.default_cost_price,
+               MAX(s.date_sold) as last_sale
+        FROM products p
+        LEFT JOIN sales s ON s.product_id = p.id
+        WHERE p.is_active = 1
+          AND p.current_stock > 0
+        GROUP BY p.id
+        HAVING last_sale IS NULL
+            OR last_sale < ?
+        ORDER BY p.current_stock DESC
+        LIMIT 10
+      ''', [thirtyDaysAgo]);
+
+      final deadStockItems = deadMaps.map((m) {
+        final stock = m['current_stock'] as int;
+        final cost = (m['default_cost_price'] as num).toDouble();
+        return DeadStockItem(
+          productId: m['id'] as int,
+          productName: m['name'] as String,
+          currentStock: stock,
+          stockValue: stock * cost,
+          lastSaleDate: m['last_sale'] as String? ?? 'Never sold',
+        );
+      }).toList();
+
+      final topMaps = await db.rawQuery('''
+        SELECT
+          p.name as product_name,
+          COALESCE(SUM(s.quantity_sold), 0) as total_units,
+          COALESCE(SUM(s.total_revenue), 0) as total_revenue,
+          COUNT(DISTINCT sm.id) as restock_count
+        FROM products p
+        LEFT JOIN sales s
+          ON s.product_id = p.id
+          AND s.sale_source = 'stock'
+        LEFT JOIN stock_movements sm
+          ON sm.product_id = p.id
+          AND sm.movement_type = 'restock'
+        WHERE p.is_active = 1
+        GROUP BY p.id
+        ORDER BY total_units DESC
+        LIMIT 10
+      ''');
+
+      final topMoving = topMaps
+          .map(
+            (m) => TopMovingItem(
+              productName: m['product_name'] as String,
+              totalUnitsSold: (m['total_units'] as num).toInt(),
+              totalRevenue: (m['total_revenue'] as num).toDouble(),
+              restockCount: (m['restock_count'] as num).toInt(),
+            ),
+          )
+          .toList();
+
+      return InventoryReportData(
+        totalProducts: allProducts.length,
+        inStockCount: inStock,
+        lowStockCount: lowStock,
+        outOfStockCount: outOfStock,
+        totalStockValueAtCost: costValue,
+        totalStockValueAtRetail: retailValue,
+        potentialProfit: potentialProfit,
+        lowStockItems: lowStockItems,
+        deadStockItems: deadStockItems,
+        topMovingItems: topMoving,
+      );
+    } catch (e) {
+      logDebug('DatabaseHelper.getInventoryReportData error: $e');
+      rethrow;
+    }
+  }
+
+  /// Get customer report data for a date range.
+  Future<CustomerReportData> getCustomerReportData({
+    required String dateFrom,
+    required String dateTo,
+  }) async {
+    try {
+      final db = await database;
+
+      final totalResult = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM customers',
+      );
+      final total = Sqflite.firstIntValue(totalResult) ?? 0;
+
+      final newResult = await db.rawQuery('''
+        SELECT COUNT(*) as count FROM customers
+        WHERE date_added >= ? AND date_added <= ?
+      ''', [dateFrom, dateTo]);
+      final newCount = Sqflite.firstIntValue(newResult) ?? 0;
+
+      final debtResult = await db.rawQuery('''
+        SELECT COUNT(DISTINCT customer_id) as count
+        FROM debts
+        WHERE customer_id IS NOT NULL
+          AND is_cleared = 0
+      ''');
+      final withDebt = Sqflite.firstIntValue(debtResult) ?? 0;
+
+      final balanceResult = await db.rawQuery('''
+        SELECT COALESCE(SUM(balance), 0) as total
+        FROM debts
+        WHERE customer_id IS NOT NULL
+          AND is_cleared = 0
+      ''');
+      final totalDebt =
+          (balanceResult.first['total'] as num?)?.toDouble() ?? 0.0;
+
+      final topResult = await db.rawQuery('''
+        SELECT
+          c.id, c.name, c.phone,
+          COUNT(s.id) as purchase_count,
+          COALESCE(SUM(s.total_revenue), 0) as total_spent,
+          MAX(s.date_sold) as last_purchase
+        FROM customers c
+        LEFT JOIN sales s
+          ON s.customer_id = c.id
+          AND s.is_fully_paid = 1
+          AND s.date_sold >= ?
+          AND s.date_sold <= ?
+        GROUP BY c.id
+        ORDER BY total_spent DESC
+        LIMIT 10
+      ''', [dateFrom, dateTo]);
+
+      final topCustomers = topResult
+          .map(
+            (m) => TopCustomer(
+              customerId: m['id'] as int,
+              customerName: m['name'] as String,
+              customerPhone: m['phone'] as String?,
+              totalPurchases: (m['purchase_count'] as num).toInt(),
+              totalSpent: (m['total_spent'] as num).toDouble(),
+              lastPurchaseDate: m['last_purchase'] as String?,
+            ),
+          )
+          .toList();
+
+      final debtDetailResult = await db.rawQuery('''
+        SELECT
+          c.id, c.name, c.phone,
+          SUM(d.balance) as total_balance,
+          COUNT(d.id) as debt_count
+        FROM customers c
+        INNER JOIN debts d
+          ON d.customer_id = c.id
+          AND d.is_cleared = 0
+        GROUP BY c.id
+        ORDER BY total_balance DESC
+        LIMIT 10
+      ''');
+
+      final debtItems = debtDetailResult
+          .map(
+            (m) => CustomerDebtItem(
+              customerId: m['id'] as int,
+              customerName: m['name'] as String,
+              customerPhone: m['phone'] as String?,
+              totalDebtBalance: (m['total_balance'] as num).toDouble(),
+              debtCount: (m['debt_count'] as num).toInt(),
+            ),
+          )
+          .toList();
+
+      return CustomerReportData(
+        totalCustomers: total,
+        newCustomersThisPeriod: newCount,
+        customersWithDebt: withDebt,
+        totalOutstandingDebt: totalDebt,
+        topCustomers: topCustomers,
+        customersWithActiveDebt: debtItems,
+      );
+    } catch (e) {
+      logDebug('DatabaseHelper.getCustomerReportData error: $e');
+      rethrow;
+    }
+  }
+
+  /// Get sale source breakdown for a date range.
+  Future<SaleSourceBreakdown> getSaleSourceBreakdown({
+    required String dateFrom,
+    required String dateTo,
+    String paymentMethodFilter = 'all',
+    String saleTypeFilter = 'all',
+    String saleSourceFilter = 'all',
+  }) async {
+    try {
+      final db = await database;
+      final filter = _reportFilterClause(
+        paymentMethodFilter: paymentMethodFilter,
+        saleTypeFilter: saleTypeFilter,
+        saleSourceFilter: saleSourceFilter,
+      );
+
+      final result = await db.rawQuery('''
+        SELECT
+          sale_source,
+          COUNT(*) as count,
+          COALESCE(SUM(total_revenue), 0) as revenue
+        FROM sales
+        WHERE date_sold >= ? AND date_sold <= ?
+          AND is_fully_paid = 1
+          $filter
+        GROUP BY sale_source
+      ''', [dateFrom, dateTo]);
+
+      var stockCount = 0;
+      var spotCount = 0;
+      var serviceCount = 0;
+      var manualCount = 0;
+      var stockRev = 0.0;
+      var spotRev = 0.0;
+      var serviceRev = 0.0;
+      var manualRev = 0.0;
+
+      for (final row in result) {
+        final source = row['sale_source'] as String;
+        final count = (row['count'] as num).toInt();
+        final rev = (row['revenue'] as num).toDouble();
+        switch (source) {
+          case 'stock':
+            stockCount = count;
+            stockRev = rev;
+          case 'spot_buy':
+            spotCount = count;
+            spotRev = rev;
+          case 'service':
+            serviceCount = count;
+            serviceRev = rev;
+          default:
+            manualCount += count;
+            manualRev += rev;
+        }
+      }
+
+      return SaleSourceBreakdown(
+        stockCount: stockCount,
+        stockRevenue: stockRev,
+        spotBuyCount: spotCount,
+        spotBuyRevenue: spotRev,
+        serviceCount: serviceCount,
+        serviceRevenue: serviceRev,
+        manualCount: manualCount,
+        manualRevenue: manualRev,
+      );
+    } catch (e) {
+      logDebug('DatabaseHelper.getSaleSourceBreakdown error: $e');
+      rethrow;
     }
   }
 }

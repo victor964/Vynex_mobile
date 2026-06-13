@@ -14,7 +14,10 @@ import '../../core/utils/backup_service.dart';
 import '../../core/utils/snackbar_helper.dart';
 import '../../core/utils/validators.dart';
 import '../../models/business_settings.dart';
+import '../../core/utils/category_icons.dart';
+import '../../models/category.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/category_provider.dart';
 import '../../providers/debt_provider.dart';
 import '../../providers/purchase_provider.dart';
 import '../../providers/report_provider.dart';
@@ -23,6 +26,7 @@ import '../../providers/settings_provider.dart';
 import '../../widgets/common/confirm_dialog.dart';
 import '../../widgets/common/vynex_button.dart';
 import '../../widgets/common/vynex_card.dart';
+import '../../widgets/catalog/category_sheets.dart';
 import '../../widgets/common/vynex_text_field.dart';
 
 /// Business settings, backup, restore, and security screen.
@@ -59,6 +63,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadAndPopulate();
+      context.read<CategoryProvider>().loadCategories();
     });
   }
 
@@ -298,6 +303,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       _buildProfileSection(),
                       const SizedBox(height: 12),
+                      _buildCategoriesSection(),
+                      const SizedBox(height: 12),
                       _buildPreviewSection(),
                       const SizedBox(height: 12),
                       _buildSecuritySection(),
@@ -431,6 +438,108 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildCategoriesSection() {
+    return VynexCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(
+            icon: Icons.local_offer_rounded,
+            title: 'Product Categories',
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Manage your product categories',
+            style: TextStyle(
+              color: AppColors.midGrey,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Consumer<CategoryProvider>(
+            builder: (context, provider, _) {
+              if (provider.isLoading && provider.categories.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: AppColors.gold,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              final categories = provider.categories;
+              if (categories.isEmpty) {
+                return const Text(
+                  'No categories yet.',
+                  style: TextStyle(color: AppColors.midGrey, fontSize: 13),
+                );
+              }
+
+              return Column(
+                children: [
+                  for (final cat in categories)
+                    _CategorySettingsRow(
+                      category: cat,
+                      onEdit: () => showEditCategoryBottomSheet(
+                        context,
+                        cat,
+                      ),
+                      onDelete: () => _deleteCategory(cat),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => showAddCategoryBottomSheet(context),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add Category'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.gold,
+              side: const BorderSide(color: AppColors.gold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteCategory(Category category) async {
+    if (category.isPredefined) return;
+
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Delete Category?',
+      message: 'Delete "${category.name}"? Products in this category '
+          'will become uncategorized.',
+      confirmLabel: 'Delete',
+      isDestructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final success = await context.read<CategoryProvider>().deleteCategory(
+          category.id!,
+        );
+
+    if (!mounted) return;
+
+    if (success) {
+      HapticFeedback.lightImpact();
+      SnackBarHelper.showSuccess(context, 'Category deleted');
+    } else {
+      SnackBarHelper.showError(context, 'Failed to delete category');
+    }
   }
 
   Widget _buildPreviewSection() {
@@ -880,6 +989,76 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CategorySettingsRow extends StatelessWidget {
+  const _CategorySettingsRow({
+    required this.category,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Category category;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(
+            categoryIconFromName(category.iconName),
+            color: categoryColorFromHex(category.colorHex),
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              category.name,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: AppColors.black,
+              ),
+            ),
+          ),
+          if (category.isPredefined)
+            const Text(
+              'Default',
+              style: TextStyle(
+                color: AppColors.midGrey,
+                fontSize: 11,
+              ),
+            )
+          else ...[
+            IconButton(
+              icon: const Icon(
+                Icons.edit_rounded,
+                color: AppColors.gold,
+                size: 20,
+              ),
+              onPressed: onEdit,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 12),
+            IconButton(
+              icon: const Icon(
+                Icons.delete_outline,
+                color: AppColors.danger,
+                size: 20,
+              ),
+              onPressed: onDelete,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

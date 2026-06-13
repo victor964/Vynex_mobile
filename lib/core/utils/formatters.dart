@@ -47,6 +47,17 @@ class Formatters {
         .format(DateTime(month.year, month.month + 1, 0));
   }
 
+  /// Format currency in compact form for charts and legends.
+  static String compactCurrency(double amount, String currencyLabel) {
+    if (amount >= 1000000) {
+      return '$currencyLabel ${(amount / 1000000).toStringAsFixed(1)}M';
+    }
+    if (amount >= 1000) {
+      return '$currencyLabel ${(amount / 1000).toStringAsFixed(1)}K';
+    }
+    return formatCurrency(amount, currencyLabel);
+  }
+
   /// Get a short date label like 'Jun 2025'.
   static String shortMonth(DateTime date) {
     return DateFormat('MMM yyyy').format(date);

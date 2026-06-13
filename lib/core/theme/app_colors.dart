@@ -38,4 +38,15 @@ class AppColors {
   static const Color appBarTitle = gold;
   static const Color divider = Color(0xFFE0E0E0);
   static const Color goldOverlay = Color(0x26FFD700);
+
+  // V2 inventory status colors
+  static const Color inStock = success;
+  static const Color lowStock = warning;
+  static const Color outOfStock = danger;
+
+  // V2 onboarding slide accents
+  static const Color onboardingIconBg = Color(0xFF2A2A2A);
+  static const Color onboardingSuccessBg = Color(0xFF1A2E1A);
+  static const Color onboardingCustomerBg = Color(0xFF1A1A2E);
+  static const Color customerBlue = Color(0xFF2196F3);
 }
