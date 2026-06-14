@@ -477,7 +477,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             onPressed: () => context.push(AppRoutes.inventory),
             child: const Text(
               'View All in Inventory',
-              style: TextStyle(color: AppColors.gold),
+              style: TextStyle(color: AppColors.goldOnLight),
             ),
           ),
         ],

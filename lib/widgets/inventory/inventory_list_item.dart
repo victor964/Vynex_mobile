@@ -142,13 +142,13 @@ class InventoryListItem extends StatelessWidget {
                         icon: const Icon(
                           Icons.add_circle_outline,
                           size: 16,
-                          color: AppColors.gold,
+                          color: AppColors.goldOnLight,
                         ),
                         label: const Text(
                           '+ Add Stock',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.gold,
+                            color: AppColors.goldOnLight,
                           ),
                         ),
                         style: TextButton.styleFrom(

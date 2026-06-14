@@ -21,7 +21,7 @@ class ProductFormSectionLabel extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            color: AppColors.gold,
+            color: AppColors.goldOnLight,
             fontWeight: FontWeight.bold,
             fontSize: 11,
             letterSpacing: 0.8,
@@ -31,7 +31,7 @@ class ProductFormSectionLabel extends StatelessWidget {
         Container(
           height: 1,
           width: 40,
-          color: AppColors.gold,
+          color: AppColors.goldOnLight,
         ),
         const SizedBox(height: 12),
       ],
@@ -67,7 +67,7 @@ class CategoryPickerField extends StatelessWidget {
           children: [
             const Icon(
               Icons.category_rounded,
-              color: AppColors.gold,
+              color: AppColors.goldOnLight,
               size: 18,
             ),
             const SizedBox(width: 10),
@@ -120,7 +120,7 @@ class UnitPickerField extends StatelessWidget {
           children: [
             const Icon(
               Icons.straighten_rounded,
-              color: AppColors.gold,
+              color: AppColors.goldOnLight,
               size: 18,
             ),
             const SizedBox(width: 10),
@@ -196,7 +196,7 @@ class BarcodeField extends StatelessWidget {
         onPressed: onScan,
         icon: const Icon(
           Icons.qr_code_scanner_rounded,
-          color: AppColors.gold,
+          color: AppColors.goldOnLight,
         ),
         tooltip: 'Scan barcode',
       ),
@@ -247,7 +247,7 @@ Future<String?> showUnitPickerSheet(
               return ListTile(
                 title: Text(unit),
                 trailing: unit == currentUnit
-                    ? const Icon(Icons.check, color: AppColors.gold)
+                    ? const Icon(Icons.check, color: AppColors.goldOnLight)
                     : null,
                 onTap: () => Navigator.pop(sheetContext, unit),
               );
@@ -298,7 +298,7 @@ class ProductInfoBox extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, color: AppColors.gold, size: 18),
+          const Icon(Icons.info_outline, color: AppColors.goldOnLight, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

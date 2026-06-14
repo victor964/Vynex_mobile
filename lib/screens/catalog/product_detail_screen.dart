@@ -382,7 +382,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   child: const Text(
                     'View All',
-                    style: TextStyle(color: AppColors.gold),
+                    style: TextStyle(color: AppColors.goldOnLight),
                   ),
                 ),
               ],

@@ -236,7 +236,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           'Retail value: '
           '${Formatters.formatCurrency(provider.totalRetailValue, currency)}',
           style: const TextStyle(
-            color: AppColors.gold,
+            color: AppColors.goldOnLight,
             fontSize: 13,
             fontWeight: FontWeight.bold,
           ),
@@ -286,7 +286,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: selected ? AppColors.black : AppColors.gold,
+              color: selected ? AppColors.black : AppColors.goldOnLight,
             ),
           ),
         ),
@@ -305,7 +305,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         children: [
           const Padding(
             padding: EdgeInsets.only(left: 12),
-            child: Icon(Icons.search, color: AppColors.gold, size: 20),
+            child: Icon(Icons.search, color: AppColors.goldOnLight, size: 20),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -322,7 +322,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
           if (_searchQuery.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.close, color: AppColors.gold, size: 20),
+              icon: const Icon(Icons.close, color: AppColors.goldOnLight, size: 20),
               onPressed: () => setState(() => _searchQuery = ''),
             ),
         ],

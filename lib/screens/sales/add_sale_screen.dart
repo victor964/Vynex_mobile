@@ -301,7 +301,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
     return Text(
       text,
       style: const TextStyle(
-        color: AppColors.gold,
+        color: AppColors.goldOnLight,
         fontWeight: FontWeight.bold,
         fontSize: 11,
         letterSpacing: 0.8,

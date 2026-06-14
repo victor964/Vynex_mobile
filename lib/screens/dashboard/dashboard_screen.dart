@@ -173,10 +173,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   currency,
                 ),
                 icon: Icons.trending_up_rounded,
-                accentColor:
-                    data.totalProfit > 0 ? AppColors.success : AppColors.danger,
-                valueColor:
-                    data.totalProfit > 0 ? AppColors.success : AppColors.danger,
+                accentColor: data.totalProfit < 0
+                    ? AppColors.danger
+                    : data.totalProfit > 0
+                        ? AppColors.success
+                        : AppColors.midGrey,
+                valueColor: data.totalProfit < 0
+                    ? AppColors.danger
+                    : data.totalProfit > 0
+                        ? AppColors.success
+                        : AppColors.midGrey,
               ),
             ),
             GestureDetector(
@@ -204,7 +210,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       const Icon(
                         Icons.inventory_2_rounded,
-                        color: AppColors.gold,
+                        color: AppColors.goldOnLight,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
@@ -218,11 +224,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const Spacer(),
                       GestureDetector(
-                        onTap: () => context.go(AppRoutes.inventory),
+                        onTap: () => context.push(AppRoutes.inventory),
                         child: const Text(
                           'View All',
                           style: TextStyle(
-                            color: AppColors.gold,
+                            color: AppColors.goldOnLight,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -261,7 +267,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       data.lowStockCount > 0) ...[
                     const SizedBox(height: 8),
                     GestureDetector(
-                      onTap: () => context.go(AppRoutes.inventory),
+                      onTap: () => context.push(AppRoutes.inventory),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -316,7 +322,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   const Icon(
                     Icons.people_rounded,
-                    color: AppColors.gold,
+                    color: AppColors.goldOnLight,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
@@ -359,7 +365,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: const Text(
                       'View All',
                       style: TextStyle(
-                        color: AppColors.gold,
+                        color: AppColors.goldOnLight,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -415,16 +421,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => context.go(AppRoutes.inventory),
+                onPressed: () => context.push(AppRoutes.inventory),
                 icon: const Icon(
                   Icons.inventory_2_rounded,
-                  color: AppColors.gold,
+                  color: AppColors.goldOnLight,
                   size: 16,
                 ),
                 label: const Text(
                   'Inventory',
                   style: TextStyle(
-                    color: AppColors.gold,
+                    color: AppColors.goldOnLight,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -456,7 +462,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Icon(
                     Icons.calendar_month,
-                    color: AppColors.gold,
+                    color: AppColors.goldOnLight,
                     size: 20,
                   ),
                   SizedBox(width: 8),
@@ -476,7 +482,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   data.monthRevenue,
                   currency,
                 ),
-                valueColor: AppColors.gold,
+                valueColor: data.monthRevenue > 0
+                    ? AppColors.goldOnLight
+                    : AppColors.midGrey,
                 showDivider: true,
               ),
               _MonthRow(
@@ -603,7 +611,7 @@ class _MoreActionButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.gold,
+          foregroundColor: AppColors.goldOnLight,
           side: const BorderSide(color: AppColors.gold),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
@@ -623,6 +631,7 @@ class _MoreActionButton extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
+                    color: AppColors.goldOnLight,
                   ),
                 ),
               )
@@ -631,6 +640,7 @@ class _MoreActionButton extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
+                  color: AppColors.goldOnLight,
                 ),
               ),
       ),
@@ -741,7 +751,11 @@ class _SectionHeader extends StatelessWidget {
           onPressed: onViewAll,
           child: const Text(
             'View All',
-            style: TextStyle(color: AppColors.gold),
+            style: TextStyle(
+              color: AppColors.goldOnLight,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
           ),
         ),
       ],

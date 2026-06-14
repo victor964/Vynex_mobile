@@ -45,9 +45,15 @@ class VynexAppBar extends StatelessWidget implements PreferredSizeWidget {
       automaticallyImplyLeading: showBack,
       leading: showBack
           ? IconButton(
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: const Icon(Icons.arrow_back_ios_rounded),
               color: AppColors.gold,
-              onPressed: () => context.pop(),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go(AppRoutes.dashboard);
+                }
+              },
             )
           : null,
       title: Text(

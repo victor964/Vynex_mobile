@@ -9,6 +9,12 @@ class AppColors {
 
   static const Color gold = Color(0xFFFFD700);
   static const Color goldDark = Color(0xFFB8960C);
+
+  /// Gold text on dark backgrounds (nav, app bar).
+  static const Color goldOnDark = Color(0xFFFFD700);
+
+  /// Gold text on light backgrounds (cards, white).
+  static const Color goldOnLight = Color(0xFFB8960C);
   static const Color black = Color(0xFF1A1A1A);
   static const Color white = Color(0xFFFFFFFF);
   static const Color offWhite = Color(0xFFF9F9F9);

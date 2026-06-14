@@ -88,7 +88,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 14,
-              color: AppColors.gold,
+              color: AppColors.goldOnLight,
             ),
           ),
           const Spacer(),
@@ -121,7 +121,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
               padding: EdgeInsets.only(left: 12),
               child: Icon(
                 Icons.person_search,
-                color: AppColors.gold,
+                color: AppColors.goldOnLight,
                 size: 20,
               ),
             ),
@@ -140,7 +140,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
               IconButton(
                 icon: const Icon(
                   Icons.close,
-                  color: AppColors.gold,
+                  color: AppColors.goldOnLight,
                   size: 20,
                 ),
                 onPressed: provider.clearSearch,

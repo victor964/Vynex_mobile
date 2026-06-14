@@ -340,7 +340,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                       ),
                       child: const Text(
                         'Adjust Stock',
-                        style: TextStyle(color: AppColors.gold),
+                        style: TextStyle(color: AppColors.goldOnLight),
                       ),
                     ),
                   ],

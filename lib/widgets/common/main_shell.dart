@@ -93,6 +93,11 @@ class _MainShellState extends State<MainShell> {
         backgroundColor: AppColors.black,
         selectedItemColor: AppColors.gold,
         unselectedItemColor: AppColors.midGrey,
+        unselectedLabelStyle: const TextStyle(fontSize: 10),
+        selectedLabelStyle: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
         type: BottomNavigationBarType.fixed,
         items: _tabs
             .map(

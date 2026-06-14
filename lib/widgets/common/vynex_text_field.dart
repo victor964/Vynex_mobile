@@ -64,7 +64,7 @@ class VynexTextField extends StatelessWidget {
         hintText: hint,
         prefixText: prefixText,
         prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: AppColors.gold, size: 20)
+            ? Icon(prefixIcon, color: AppColors.goldOnLight, size: 20)
             : null,
         suffixIcon: suffixIcon,
       ),

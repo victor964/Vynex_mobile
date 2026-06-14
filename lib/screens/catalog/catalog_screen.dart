@@ -94,7 +94,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.only(left: 12),
-              child: Icon(Icons.search, color: AppColors.gold, size: 20),
+              child: Icon(Icons.search, color: AppColors.goldOnLight, size: 20),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -109,7 +109,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             ),
             if (provider.searchQuery.isNotEmpty)
               IconButton(
-                icon: const Icon(Icons.close, color: AppColors.gold, size: 20),
+                icon: const Icon(Icons.close, color: AppColors.goldOnLight, size: 20),
                 onPressed: () => provider.setSearchQuery(''),
               ),
           ],
@@ -278,7 +278,7 @@ class _CategoryChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? AppColors.black : AppColors.darkGrey,
+            color: isSelected ? AppColors.black : AppColors.goldOnLight,
           ),
         ),
       ),

@@ -1,5 +1,6 @@
-# Local development only (not part of V1 release repo)
+# Local development only (not part of release repo)
 PROJECT_STATUS.md
+PROJECT_STATUS_V2.md
 .cursor/
 .cursorrules
 
