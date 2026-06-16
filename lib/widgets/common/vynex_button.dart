@@ -18,6 +18,7 @@ class VynexButton extends StatelessWidget {
     this.isLoading = false,
     this.isFullWidth = true,
     this.icon,
+    this.secondaryColor,
   });
 
   /// Gold background primary button.
@@ -28,6 +29,7 @@ class VynexButton extends StatelessWidget {
     this.isLoading = false,
     this.isFullWidth = true,
     this.icon,
+    this.secondaryColor,
   }) : variant = VynexButtonVariant.primary;
 
   /// Gold border secondary button.
@@ -38,6 +40,7 @@ class VynexButton extends StatelessWidget {
     this.isLoading = false,
     this.isFullWidth = true,
     this.icon,
+    this.secondaryColor,
   }) : variant = VynexButtonVariant.secondary;
 
   /// Red destructive button.
@@ -48,6 +51,7 @@ class VynexButton extends StatelessWidget {
     this.isLoading = false,
     this.isFullWidth = true,
     this.icon,
+    this.secondaryColor,
   }) : variant = VynexButtonVariant.danger;
 
   final String label;
@@ -56,6 +60,7 @@ class VynexButton extends StatelessWidget {
   final bool isLoading;
   final bool isFullWidth;
   final IconData? icon;
+  final Color? secondaryColor;
 
   @override
   Widget build(BuildContext context) {
@@ -95,9 +100,12 @@ class VynexButton extends StatelessWidget {
           child: child,
         );
       case VynexButtonVariant.secondary:
+        final color = secondaryColor ?? AppColors.gold;
         button = OutlinedButton(
           onPressed: isLoading ? null : onPressed,
           style: OutlinedButton.styleFrom(
+            foregroundColor: color,
+            side: BorderSide(color: color, width: 1.5),
             minimumSize: minimumSize,
           ),
           child: child,

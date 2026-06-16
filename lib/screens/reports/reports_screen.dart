@@ -414,6 +414,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               label: 'Export Inventory to Excel',
               icon: Icons.table_chart_outlined,
               isLoading: _exportingInventory,
+              secondaryColor: AppColors.goldOnLight,
               onPressed: _exportInventoryReport,
             ),
           ],
@@ -550,8 +551,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 alignment: Alignment.centerRight,
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.gold,
-                    side: const BorderSide(color: AppColors.gold),
+                    foregroundColor: AppColors.goldOnLight,
+                    side: const BorderSide(
+                      color: AppColors.goldOnLight,
+                    ),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 4,
@@ -853,7 +856,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       currency,
                     ),
                     style: const TextStyle(
-                      color: AppColors.gold,
+                      color: AppColors.goldOnLight,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -945,6 +948,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               label: 'Export Customer Report to Excel',
               icon: Icons.table_chart_outlined,
               isLoading: _exportingCustomers,
+              secondaryColor: AppColors.goldOnLight,
               onPressed: _exportCustomerReport,
             ),
           ],
@@ -1083,7 +1087,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 currency,
                               ),
                               style: const TextStyle(
-                                color: AppColors.gold,
+                                color: AppColors.goldOnLight,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                               ),
@@ -1236,8 +1240,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       const SizedBox(width: 8),
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.gold,
-                          side: const BorderSide(color: AppColors.gold),
+                          foregroundColor: AppColors.goldOnLight,
+                          side: const BorderSide(
+                            color: AppColors.goldOnLight,
+                          ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
                             vertical: 4,
@@ -1357,7 +1363,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             'Showing: ${data?.periodLabel ?? ''}',
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: AppColors.goldDark,
+              color: AppColors.goldOnLight,
               fontSize: 12,
               fontStyle: FontStyle.italic,
             ),
@@ -1381,13 +1387,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
         decoration: BoxDecoration(
           color: isActive ? AppColors.gold : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.gold),
+          border: Border.all(color: AppColors.goldOnLight),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
           style: TextStyle(
-            color: isActive ? AppColors.black : AppColors.gold,
+            color: isActive ? AppColors.black : AppColors.goldOnLight,
             fontSize: 12,
             fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
           ),
@@ -1410,7 +1416,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.gold),
+          border: Border.all(color: AppColors.goldOnLight),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1649,14 +1655,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
         decoration: BoxDecoration(
           color: isActive ? AppColors.gold : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.gold, width: 1.5),
+          border: Border.all(
+            color: AppColors.goldOnLight,
+            width: 1.5,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: isActive ? AppColors.black : AppColors.gold,
+            color: isActive ? AppColors.black : AppColors.goldOnLight,
           ),
         ),
       ),
@@ -1717,7 +1726,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     required IconData icon,
     required String label,
     required String value,
-    Color valueColor = AppColors.gold,
+    Color valueColor = AppColors.goldOnLight,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2192,7 +2201,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     Color? bgColor,
     Color? profitColor,
   }) {
-    final textColor = isHeader ? AppColors.gold : AppColors.black;
+    final textColor =
+        isHeader ? AppColors.goldOnLight : AppColors.black;
     final rowBg = isHeader ? AppColors.darkGrey : (bgColor ?? AppColors.white);
     return Container(
       decoration: BoxDecoration(
@@ -2325,6 +2335,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             label: 'Export Purchases to Excel',
             icon: Icons.shopping_bag_rounded,
             isLoading: isExportingPurchases,
+            secondaryColor: AppColors.goldOnLight,
             onPressed: onExportPurchases,
           ),
           const SizedBox(height: 10),
@@ -2332,6 +2343,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             label: 'Export Debts to Excel',
             icon: Icons.account_balance_wallet_rounded,
             isLoading: isExportingDebts,
+            secondaryColor: AppColors.goldOnLight,
             onPressed: onExportDebts,
           ),
           const SizedBox(height: 8),

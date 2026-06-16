@@ -229,7 +229,14 @@ GoRouter createAppRouter(
       GoRoute(
         path: AppRoutes.addProduct,
         name: 'addProduct',
-        builder: (context, state) => const AddProductScreen(),
+        builder: (context, state) {
+          final prefill = state.uri.queryParameters['prefill'];
+          return AddProductScreen(
+            prefillName: prefill != null && prefill.isNotEmpty
+                ? prefill
+                : null,
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.editProduct,

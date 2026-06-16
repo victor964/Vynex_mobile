@@ -20,7 +20,12 @@ import '../../widgets/common/vynex_button.dart';
 import '../../widgets/common/vynex_text_field.dart';
 
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key});
+  const AddProductScreen({
+    super.key,
+    this.prefillName,
+  });
+
+  final String? prefillName;
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -45,6 +50,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.prefillName != null && widget.prefillName!.isNotEmpty) {
+      _nameController.text = widget.prefillName!;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CategoryProvider>().loadCategories();
       context.read<SettingsProvider>().loadSettings();

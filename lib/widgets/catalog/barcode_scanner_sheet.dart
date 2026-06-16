@@ -1,8 +1,10 @@
-// barcode_scanner_sheet.dart
 // Modal bottom sheet with camera barcode scanner.
 // Returns the scanned barcode string via Navigator.pop()
 // or null if the user cancels without scanning.
 
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -18,9 +20,12 @@ class BarcodeScannerSheet extends StatefulWidget {
 }
 
 class _BarcodeScannerSheetState extends State<BarcodeScannerSheet>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   bool _torchOn = false;
   bool _isProcessing = false;
+  bool _isStarting = false;
+  bool _hasError = false;
+  String _errorMessage = '';
   late MobileScannerController _controller;
   late AnimationController _scanLineController;
   late Animation<double> _scanLineAnimation;
@@ -28,9 +33,12 @@ class _BarcodeScannerSheetState extends State<BarcodeScannerSheet>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = MobileScannerController(
+      autoStart: false,
       detectionSpeed: DetectionSpeed.normal,
       facing: CameraFacing.back,
+      torchEnabled: false,
     );
     _scanLineController = AnimationController(
       vsync: this,
@@ -43,13 +51,77 @@ class _BarcodeScannerSheetState extends State<BarcodeScannerSheet>
       parent: _scanLineController,
       curve: Curves.easeInOut,
     ));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(milliseconds: 400), _startCamera);
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     _scanLineController.dispose();
+    _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _startCamera();
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        unawaited(_controller.stop());
+    }
+  }
+
+  Future<void> _startCamera() async {
+    if (!mounted || _isStarting) return;
+    _isStarting = true;
+
+    try {
+      if (_controller.value.isRunning) {
+        await _controller.stop();
+      }
+      await _controller.start();
+    } on MobileScannerException catch (error) {
+      if (kDebugMode) {
+        debugPrint('Barcode scanner start error: ${error.errorCode}');
+      }
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = _getReadableError(error);
+        });
+      }
+    } finally {
+      _isStarting = false;
+    }
+  }
+
+  Future<void> _retryCamera() async {
+    if (!mounted) return;
+    setState(() {
+      _hasError = false;
+      _errorMessage = '';
+      _isProcessing = false;
+    });
+    try {
+      await _controller.stop();
+      await _controller.start();
+    } on MobileScannerException catch (error) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = _getReadableError(error);
+        });
+      }
+    }
   }
 
   Future<void> _toggleTorch() async {
@@ -75,6 +147,117 @@ class _BarcodeScannerSheetState extends State<BarcodeScannerSheet>
     _isProcessing = true;
     HapticFeedback.mediumImpact();
     Navigator.pop(context, cleaned);
+  }
+
+  String _getReadableError(MobileScannerException error) {
+    switch (error.errorCode) {
+      case MobileScannerErrorCode.permissionDenied:
+        return 'Camera permission was denied. '
+            'Go to Settings and allow camera access '
+            'for Vynex.';
+      case MobileScannerErrorCode.unsupported:
+        return 'Barcode scanning is not supported '
+            'on this device.';
+      case MobileScannerErrorCode.genericError:
+      default:
+        return 'Camera could not start. '
+            'Try closing other camera apps first.';
+    }
+  }
+
+  Widget _buildCameraError() {
+    return Container(
+      color: AppColors.black,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.videocam_off_rounded,
+                color: AppColors.midGrey,
+                size: 64,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Camera unavailable',
+                style: TextStyle(
+                  color: AppColors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage.isNotEmpty
+                    ? _errorMessage
+                    : 'Could not start the camera. '
+                      'Please check camera permission '
+                      'in your phone settings.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.midGrey,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _retryCamera,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.gold,
+                  foregroundColor: AppColors.black,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Try Again',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text(
+                  'Type barcode manually instead',
+                  style: TextStyle(
+                    color: AppColors.gold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder(BuildContext context) {
+    return const ColoredBox(
+      color: AppColors.black,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppColors.gold),
+            SizedBox(height: 12),
+            Text(
+              'Starting camera...',
+              style: TextStyle(
+                color: AppColors.midGrey,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -137,16 +320,34 @@ class _BarcodeScannerSheetState extends State<BarcodeScannerSheet>
                   aspectRatio: 1,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        MobileScanner(
-                          controller: _controller,
-                          onDetect: _onDetect,
-                        ),
-                        _ScanOverlay(scanLineAnimation: _scanLineAnimation),
-                      ],
-                    ),
+                    child: _hasError
+                        ? _buildCameraError()
+                        : MobileScanner(
+                            controller: _controller,
+                            fit: BoxFit.cover,
+                            useAppLifecycleState: false,
+                            onDetect: _onDetect,
+                            placeholderBuilder: _buildPlaceholder,
+                            errorBuilder: (context, error) {
+                              WidgetsBinding.instance
+                                  .addPostFrameCallback((_) {
+                                if (mounted) {
+                                  setState(() {
+                                    _hasError = true;
+                                    _errorMessage =
+                                        _getReadableError(error);
+                                  });
+                                }
+                              });
+                              return _buildCameraError();
+                            },
+                            overlayBuilder: (context, constraints) {
+                              return _ScanOverlay(
+                                scanLineAnimation: _scanLineAnimation,
+                                size: constraints.biggest,
+                              );
+                            },
+                          ),
                   ),
                 ),
               ),
@@ -211,48 +412,47 @@ class _BarcodeScannerSheetState extends State<BarcodeScannerSheet>
 }
 
 class _ScanOverlay extends StatelessWidget {
-  const _ScanOverlay({required this.scanLineAnimation});
+  const _ScanOverlay({
+    required this.scanLineAnimation,
+    required this.size,
+  });
 
   final Animation<double> scanLineAnimation;
+  final Size size;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = constraints.biggest;
-        const inset = 24.0;
-        final frameRect = Rect.fromLTWH(
-          inset,
-          inset,
-          size.width - inset * 2,
-          size.height - inset * 2,
-        );
+    const inset = 24.0;
+    final frameRect = Rect.fromLTWH(
+      inset,
+      inset,
+      size.width - inset * 2,
+      size.height - inset * 2,
+    );
 
-        return AnimatedBuilder(
-          animation: scanLineAnimation,
-          builder: (context, child) {
-            final lineTop = frameRect.top +
-                (frameRect.height - 2) * scanLineAnimation.value;
+    return AnimatedBuilder(
+      animation: scanLineAnimation,
+      builder: (context, child) {
+        final lineTop =
+            frameRect.top + (frameRect.height - 2) * scanLineAnimation.value;
 
-            return Stack(
-              children: [
-                CustomPaint(
-                  size: size,
-                  painter: _DimmedOverlayPainter(frameRect: frameRect),
-                ),
-                _CornerBrackets(rect: frameRect),
-                Positioned(
-                  left: frameRect.left,
-                  right: size.width - frameRect.right,
-                  top: lineTop,
-                  child: Container(
-                    height: 2,
-                    color: AppColors.gold,
-                  ),
-                ),
-              ],
-            );
-          },
+        return Stack(
+          children: [
+            CustomPaint(
+              size: size,
+              painter: _DimmedOverlayPainter(frameRect: frameRect),
+            ),
+            _CornerBrackets(rect: frameRect),
+            Positioned(
+              left: frameRect.left,
+              right: size.width - frameRect.right,
+              top: lineTop,
+              child: Container(
+                height: 2,
+                color: AppColors.gold,
+              ),
+            ),
+          ],
         );
       },
     );
@@ -366,6 +566,7 @@ Future<String?> showBarcodeScanner(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    enableDrag: false,
     builder: (context) => SizedBox(
       height: MediaQuery.of(context).size.height * 0.82,
       child: const BarcodeScannerSheet(),

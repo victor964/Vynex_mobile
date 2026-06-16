@@ -681,27 +681,64 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
       }
       if (!mounted) return;
       if (_saleSource == 'spot_buy') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Sale recorded. Add this item to your catalog?',
-              style: TextStyle(color: AppColors.black),
-            ),
-            backgroundColor: AppColors.gold,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 6),
-            action: SnackBarAction(
-              label: 'Add to Catalog',
-              textColor: AppColors.black,
-              onPressed: () {
-                context.push(AppRoutes.addProduct);
-              },
-            ),
+        final itemName = _itemNameController.text.trim();
+        final shouldAdd = await showDialog<bool>(
+          context: context,
+          barrierDismissible: true,
+          builder: (dialogContext) => AlertDialog(
+            backgroundColor: AppColors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
             ),
+            title: const Text(
+              'Add to Catalog?',
+              style: TextStyle(
+                color: AppColors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            content: Text(
+              'Would you like to add "$itemName" '
+              'to your product catalog for future sales?',
+              style: const TextStyle(
+                color: AppColors.darkGrey,
+                fontSize: 14,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text(
+                  'Skip',
+                  style: TextStyle(color: AppColors.midGrey),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.gold,
+                  foregroundColor: AppColors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Add to Catalog',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
         );
+        if (!mounted) return;
+        if (shouldAdd == true) {
+          context.push(
+            '${AppRoutes.addProduct}?prefill='
+            '${Uri.encodeComponent(itemName)}',
+          );
+          return;
+        }
       } else if (sale.isFullyPaid) {
         SnackBarHelper.showSuccess(
           context,
